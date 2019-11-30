@@ -1,6 +1,12 @@
 # pixiv client for go
 
+[![build status](https://github.com/NateScarlet/pixiv/workflows/Go/badge.svg)](https://github.com/NateScarlet/pixiv/actions)
+
 Pixiv go 客户端， 使用 PIXIV 网页 API。
+
+[设计文档](https://natescarlet.github.io/pixiv/)
+
+详细使用方法以代码注释为准
 
 ```go
 package main
