@@ -27,7 +27,7 @@ result.JSON // json return data.
 result.Artworks() // []client.Artwork，只有部分数据，通过 `Fetch` `FetchPages` 方法获取完整数据。
 
 // 画作详情
-i := Artwork{ID: "22238487"}
+i := client.Artwork{ID: "22238487"}
 err := i.Fetch() // 获取画作详情(不含分页), 直接更新 struct 数据。
 err := i.FetchPages() // 获取画作分页, 直接更新 struct 数据。
 
@@ -37,10 +37,10 @@ result.JSON // json return data.
 result.Novels() // []client.Novel，只有部分数据，通过 `Fetch` 方法获取完整数据。
 
 // 小说详情
-i := Novel{ID: "11983096"}
+i := client.Novel{ID: "11983096"}
 err := i.Fetch() // 获取小说详情, 直接更新 struct 数据。
 
 // 用户详情
-i := User{ID: "789096"}
+i := client.User{ID: "789096"}
 err := i.Fetch() // 获取用户详情, 直接更新 struct 数据。
 ```
