@@ -1,0 +1,278 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="zh_CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>画作排行 &#8212; pixiv go client 0.1.0 文档</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <script type="text/javascript" src="_static/translations.js"></script>
+    <link rel="index" title="索引" href="genindex.html" />
+    <link rel="search" title="搜索" href="search.html" />
+    <link rel="next" title="小说详情" href="novel.html" />
+    <link rel="prev" title="画作搜索" href="artwork_search.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="id1">
+<h1>画作排行<a class="headerlink" href="#id1" title="永久链接至标题">¶</a></h1>
+<p>页面URL: <a class="reference external" href="https://www.pixiv.net/ranking.php">https://www.pixiv.net/ranking.php</a></p>
+<p>请求参数：</p>
+<p>mode</p>
+<blockquote>
+<div><p>排行模式，必填。</p>
+<p>可选值：</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>daily</p></li>
+<li><p>weekly</p></li>
+<li><p>monthly</p></li>
+<li><p>rookie</p></li>
+<li><p>original</p></li>
+<li><p>male</p></li>
+<li><p>female</p></li>
+<li><p>daily_r18</p></li>
+<li><p>weekly_r18</p></li>
+<li><p>male_r18</p></li>
+<li><p>female_r18</p></li>
+<li><p>r18g</p></li>
+</ul>
+</div></blockquote>
+</div></blockquote>
+<p>content</p>
+<blockquote>
+<div><p>排行内容，不填则为综合排行，有些排行模式只对综合排行有效。</p>
+<p>可选值:</p>
+<blockquote>
+<div><ul class="simple">
+<li><p>illust</p></li>
+<li><p>ugoira</p></li>
+<li><p>manga</p></li>
+</ul>
+</div></blockquote>
+</div></blockquote>
+<p>date</p>
+<blockquote>
+<div><p>日期，不填则为最新排行。</p>
+<p>格式： YYYYMMDD</p>
+</div></blockquote>
+<p>format</p>
+<blockquote>
+<div><p>填为 json 时会返回 json 数据。</p>
+</div></blockquote>
+<p>p</p>
+<blockquote>
+<div><p>页码。</p>
+</div></blockquote>
+<div class="section" id="html">
+<h2>HTML 内容解析<a class="headerlink" href="#html" title="永久链接至标题">¶</a></h2>
+<p>类名为 <code class="docutils literal notranslate"><span class="pre">ranking-items</span></code> 的元素中每个 section 为一个画作。</p>
+<p>数据使用元素上的属性存储:</p>
+<p>id</p>
+<blockquote>
+<div><p>排行位数</p>
+</div></blockquote>
+<p>data-title</p>
+<blockquote>
+<div><p>画作标题</p>
+</div></blockquote>
+<p>data-user-name</p>
+<blockquote>
+<div><p>作者名称</p>
+</div></blockquote>
+<p>data-date</p>
+<blockquote>
+<div><p>画作发布时间</p>
+</div></blockquote>
+<p>data-id</p>
+<blockquote>
+<div><p>画作ID。</p>
+</div></blockquote>
+<p>在 section 内部有 user-container 元素，属性包含了作者信息。</p>
+<p>data-user_id</p>
+<blockquote>
+<div><p>作者ID。</p>
+</div></blockquote>
+<p>data-user_name</p>
+<blockquote>
+<div><p>作者名称</p>
+</div></blockquote>
+<p>data-profile_img</p>
+<blockquote>
+<div><p>作者头像 URL。</p>
+</div></blockquote>
+</div>
+<div class="section" id="json">
+<h2>JSON 数据格式<a class="headerlink" href="#json" title="永久链接至标题">¶</a></h2>
+<p>[[contents]]</p>
+<p>title</p>
+<blockquote>
+<div><p>画作标题</p>
+</div></blockquote>
+<p>tags</p>
+<blockquote>
+<div><p>标签列表</p>
+</div></blockquote>
+<p>url</p>
+<blockquote>
+<div><p>画作大图 URL。</p>
+</div></blockquote>
+<p>illust_type</p>
+<blockquote>
+<div><p>画作类型</p>
+</div></blockquote>
+<p>illust_page_count</p>
+<blockquote>
+<div><p>画作页数</p>
+</div></blockquote>
+<p>user_name</p>
+<blockquote>
+<div><p>作者名称</p>
+</div></blockquote>
+<p>profile_img</p>
+<blockquote>
+<div><p>作者头像</p>
+</div></blockquote>
+<p>illust_id</p>
+<blockquote>
+<div><p>画作 ID。</p>
+</div></blockquote>
+<p>width</p>
+<blockquote>
+<div><p>画作宽度</p>
+</div></blockquote>
+<p>height</p>
+<blockquote>
+<div><p>画作高度</p>
+</div></blockquote>
+<p>user_id</p>
+<blockquote>
+<div><p>作者 ID。</p>
+</div></blockquote>
+<p>rank</p>
+<blockquote>
+<div><p>排名</p>
+</div></blockquote>
+<p>yes_rank</p>
+<blockquote>
+<div><p>昨日排名</p>
+</div></blockquote>
+<p>illust_upload_timestamp</p>
+<blockquote>
+<div><p>画作上传时间戳</p>
+</div></blockquote>
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">pixiv go client</a></h1>
+
+
+
+<p class="blurb">pixiv go 客户端</p>
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=NateScarlet&repo=pixiv&type=watch&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>导航</h3>
+<p class="caption"><span class="caption-text">内容:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="auth.html">授权</a></li>
+<li class="toctree-l1"><a class="reference internal" href="artwork.html">画作详情</a></li>
+<li class="toctree-l1"><a class="reference internal" href="artwork.html#id2">画作分页详情</a></li>
+<li class="toctree-l1"><a class="reference internal" href="artwork_search.html">画作搜索</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">画作排行</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#html">HTML 内容解析</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#json">JSON 数据格式</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="novel.html">小说详情</a></li>
+<li class="toctree-l1"><a class="reference internal" href="novel.html#id2">小说插图</a></li>
+<li class="toctree-l1"><a class="reference internal" href="novel_search.html">小说搜索</a></li>
+<li class="toctree-l1"><a class="reference internal" href="novel_rank.html">画作排行</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user.html">用户详情</a></li>
+<li class="toctree-l1"><a class="reference internal" href="env-vars.html">环境变量</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="artwork_search.html" title="上一章">画作搜索</a></li>
+      <li>Next: <a href="novel.html" title="下一章">小说详情</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">快速搜索</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="转向" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, NateScarlet.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/artwork_rank.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

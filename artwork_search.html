@@ -1,0 +1,232 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="zh_CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>画作搜索 &#8212; pixiv go client 0.1.0 文档</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <script type="text/javascript" src="_static/translations.js"></script>
+    <link rel="index" title="索引" href="genindex.html" />
+    <link rel="search" title="搜索" href="search.html" />
+    <link rel="next" title="画作排行" href="artwork_rank.html" />
+    <link rel="prev" title="画作详情" href="artwork.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="id1">
+<h1>画作搜索<a class="headerlink" href="#id1" title="永久链接至标题">¶</a></h1>
+<p>API 地址格式: <code class="docutils literal notranslate"><span class="pre">https://www.pixiv.net/ajax/search/artworks/&lt;标签&gt;</span></code></p>
+<p>API 参数:</p>
+<p>p</p>
+<blockquote>
+<div><p>页号</p>
+</div></blockquote>
+<p>数据格式:</p>
+<p>[body.illustManga]</p>
+<p>isAdContainer</p>
+<blockquote>
+<div><p>类型: true | undefined | false</p>
+<p>是否为广告容器。</p>
+<p>2019-06-16: 40 张图， 其中可能有 1 广告。</p>
+<p>2019-11-20: 改成 API 调用了，60 张图其中可能有 1 广告。</p>
+</div></blockquote>
+<p>illustId</p>
+<blockquote>
+<div><p>类型: string | null</p>
+<p>插画 Id。</p>
+</div></blockquote>
+<p>illustTitle</p>
+<blockquote>
+<div><p>类型: string</p>
+<p>插画标题。</p>
+</div></blockquote>
+<p>illustType</p>
+<blockquote>
+<div><p>类型: “0” | “1” | “2”</p>
+<p>插画类型， 0: 插画 1: 漫画 2: 动图。</p>
+</div></blockquote>
+<p>url</p>
+<blockquote>
+<div><p>类型: string</p>
+<p>缩略图地址。</p>
+</div></blockquote>
+<p>tags</p>
+<blockquote>
+<div><p>类型: string[]</p>
+<p>标签。</p>
+</div></blockquote>
+<p>userId</p>
+<blockquote>
+<div><p>类型: string</p>
+<p>作者 Id。</p>
+</div></blockquote>
+<p>userName</p>
+<blockquote>
+<div><p>类型: string</p>
+<p>作者名称。</p>
+</div></blockquote>
+<p>profileImageUrl</p>
+<blockquote>
+<div><p>类型: string</p>
+<p>作者头像地址</p>
+</div></blockquote>
+<p>isBookmarkable</p>
+<blockquote>
+<div><p>类型: boolean | null</p>
+<p>是否可收藏，未登录时为 null。</p>
+</div></blockquote>
+<p>bookmarkData</p>
+<blockquote>
+<div><p>类型: object | null</p>
+<p>当前用户的收藏状况，未登录时为 null。</p>
+</div></blockquote>
+<p>bookmarkData.id</p>
+<blockquote>
+<div><p>类型: string</p>
+<p>收藏 ID。</p>
+</div></blockquote>
+<p>bookmarkData.private</p>
+<blockquote>
+<div><p>类型: boolean</p>
+<p>是否为非公开收藏。</p>
+</div></blockquote>
+<p>width</p>
+<blockquote>
+<div><p>类型: number</p>
+<p>图片原始宽度。</p>
+</div></blockquote>
+<p>height</p>
+<blockquote>
+<div><p>类型: height</p>
+<p>图片原始高度。</p>
+</div></blockquote>
+<p>pageCount</p>
+<blockquote>
+<div><p>类型: number</p>
+<p>页数。</p>
+</div></blockquote>
+<p>profileImageUrl</p>
+<blockquote>
+<div><p>类型: string</p>
+<p>用户头像地址。</p>
+</div></blockquote>
+<p>[body.popular]</p>
+<p>[[body.popular.permanent]]</p>
+<blockquote>
+<div><p>类型同 [body.illustManga]</p>
+</div></blockquote>
+<p>[[body.popular.recent]]</p>
+<blockquote>
+<div><p>类型同 [body.illustManga]</p>
+</div></blockquote>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">pixiv go client</a></h1>
+
+
+
+<p class="blurb">pixiv go 客户端</p>
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=NateScarlet&repo=pixiv&type=watch&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>导航</h3>
+<p class="caption"><span class="caption-text">内容:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="auth.html">授权</a></li>
+<li class="toctree-l1"><a class="reference internal" href="artwork.html">画作详情</a></li>
+<li class="toctree-l1"><a class="reference internal" href="artwork.html#id2">画作分页详情</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">画作搜索</a></li>
+<li class="toctree-l1"><a class="reference internal" href="artwork_rank.html">画作排行</a></li>
+<li class="toctree-l1"><a class="reference internal" href="novel.html">小说详情</a></li>
+<li class="toctree-l1"><a class="reference internal" href="novel.html#id2">小说插图</a></li>
+<li class="toctree-l1"><a class="reference internal" href="novel_search.html">小说搜索</a></li>
+<li class="toctree-l1"><a class="reference internal" href="novel_rank.html">画作排行</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user.html">用户详情</a></li>
+<li class="toctree-l1"><a class="reference internal" href="env-vars.html">环境变量</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="artwork.html" title="上一章">画作详情</a></li>
+      <li>Next: <a href="artwork_rank.html" title="下一章">画作排行</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">快速搜索</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="转向" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, NateScarlet.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/artwork_search.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

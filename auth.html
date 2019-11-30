@@ -1,0 +1,174 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="zh_CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>授权 &#8212; pixiv go client 0.1.0 文档</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <script type="text/javascript" src="_static/translations.js"></script>
+    <link rel="index" title="索引" href="genindex.html" />
+    <link rel="search" title="搜索" href="search.html" />
+    <link rel="next" title="画作详情" href="artwork.html" />
+    <link rel="prev" title="Pixiv go 客户端" href="index.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="id1">
+<h1>授权<a class="headerlink" href="#id1" title="永久链接至标题">¶</a></h1>
+<p>Pixiv 被墙所以需要配置代理。</p>
+<p>不登录时无法看到 R-18 内容，登录需要 Cookie 值 <code class="docutils literal notranslate"><span class="pre">PHPSESSID</span></code>。</p>
+<p>图片带有 referer 标头检查，需要本地缓存。</p>
+<div class="section" id="id2">
+<h2>登录<a class="headerlink" href="#id2" title="永久链接至标题">¶</a></h2>
+<p>登录表单提交地址 <code class="docutils literal notranslate"><span class="pre">https://accounts.pixiv.net/api/login?lang=zh</span></code></p>
+<p>表单数据:</p>
+<p>pixiv_id</p>
+<blockquote>
+<div><p>用户名</p>
+</div></blockquote>
+<p>password</p>
+<blockquote>
+<div><p>密码</p>
+</div></blockquote>
+<p>post_key</p>
+<blockquote>
+<div><p>登录页面 <code class="docutils literal notranslate"><span class="pre">https://accounts.pixiv.net/login?lang=zh</span></code> 上 <code class="docutils literal notranslate"><span class="pre">input[name=&quot;post_key&quot;]</span></code> 元素的 <code class="docutils literal notranslate"><span class="pre">value</span></code> 属性。</p>
+</div></blockquote>
+<p>提交表单时请求必须带 <code class="docutils literal notranslate"><span class="pre">post_key</span></code> 对应的 <code class="docutils literal notranslate"><span class="pre">PHPSESSID</span></code> Cookie。</p>
+<p>成功时返回值:</p>
+<div class="highlight-json notranslate"><div class="highlight"><pre><span></span><span class="p">{</span>
+    <span class="nt">&quot;body&quot;</span><span class="p">:</span> <span class="p">{</span>
+        <span class="nt">&quot;success&quot;</span><span class="p">:</span> <span class="p">{</span>
+            <span class="nt">&quot;return_to&quot;</span><span class="p">:</span> <span class="s2">&quot;https://www.pixiv.net/&quot;</span>
+        <span class="p">}</span>
+    <span class="p">},</span>
+    <span class="nt">&quot;error&quot;</span><span class="p">:</span> <span class="kc">false</span><span class="p">,</span>
+    <span class="nt">&quot;message&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<div class="section" id="id3">
+<h3>判断是否登录<a class="headerlink" href="#id3" title="永久链接至标题">¶</a></h3>
+<p>访问 <code class="docutils literal notranslate"><span class="pre">HEAD</span> <span class="pre">https://www.pixiv.net/setting_user.php</span></code></p>
+<p>状态码 200 为登录 302 为未登录， 其他状态码报错。</p>
+</div>
+<div class="section" id="cookie">
+<h3>直接设置 Cookie<a class="headerlink" href="#cookie" title="永久链接至标题">¶</a></h3>
+<p>自动登录有时会触发 reCAPTCHA 验证， 所以支持直接设置 <code class="docutils literal notranslate"><span class="pre">PHPSESSID</span></code>。</p>
+<p>如果存在 <code class="docutils literal notranslate"><span class="pre">PIXIV_PHPSESSID</span></code> 变量将尝试直接使用此值作为登录凭据，登录无效时再尝试使用账号密码登录。</p>
+</div>
+</div>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">pixiv go client</a></h1>
+
+
+
+<p class="blurb">pixiv go 客户端</p>
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=NateScarlet&repo=pixiv&type=watch&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>导航</h3>
+<p class="caption"><span class="caption-text">内容:</span></p>
+<ul class="current">
+<li class="toctree-l1 current"><a class="current reference internal" href="#">授权</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#id2">登录</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="artwork.html">画作详情</a></li>
+<li class="toctree-l1"><a class="reference internal" href="artwork.html#id2">画作分页详情</a></li>
+<li class="toctree-l1"><a class="reference internal" href="artwork_search.html">画作搜索</a></li>
+<li class="toctree-l1"><a class="reference internal" href="artwork_rank.html">画作排行</a></li>
+<li class="toctree-l1"><a class="reference internal" href="novel.html">小说详情</a></li>
+<li class="toctree-l1"><a class="reference internal" href="novel.html#id2">小说插图</a></li>
+<li class="toctree-l1"><a class="reference internal" href="novel_search.html">小说搜索</a></li>
+<li class="toctree-l1"><a class="reference internal" href="novel_rank.html">画作排行</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user.html">用户详情</a></li>
+<li class="toctree-l1"><a class="reference internal" href="env-vars.html">环境变量</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="index.html" title="上一章">Pixiv go 客户端</a></li>
+      <li>Next: <a href="artwork.html" title="下一章">画作详情</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">快速搜索</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="转向" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, NateScarlet.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/auth.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>

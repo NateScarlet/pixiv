@@ -1,0 +1,155 @@
+
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml" lang="zh_CN">
+  <head>
+    <meta charset="utf-8" />
+    <title>小说搜索 &#8212; pixiv go client 0.1.0 文档</title>
+    <link rel="stylesheet" href="_static/alabaster.css" type="text/css" />
+    <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+    <script type="text/javascript" id="documentation_options" data-url_root="./" src="_static/documentation_options.js"></script>
+    <script type="text/javascript" src="_static/jquery.js"></script>
+    <script type="text/javascript" src="_static/underscore.js"></script>
+    <script type="text/javascript" src="_static/doctools.js"></script>
+    <script type="text/javascript" src="_static/language_data.js"></script>
+    <script type="text/javascript" src="_static/translations.js"></script>
+    <link rel="index" title="索引" href="genindex.html" />
+    <link rel="search" title="搜索" href="search.html" />
+    <link rel="next" title="画作排行" href="novel_rank.html" />
+    <link rel="prev" title="小说详情" href="novel.html" />
+   
+  <link rel="stylesheet" href="_static/custom.css" type="text/css" />
+  
+  
+  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <div class="section" id="id1">
+<h1>小说搜索<a class="headerlink" href="#id1" title="永久链接至标题">¶</a></h1>
+<p>地址: <code class="docutils literal notranslate"><span class="pre">https://www.pixiv.net/ajax/search/novels/&lt;标签&gt;&amp;p=&lt;页数&gt;</span></code></p>
+<p>一次返回 23-24 本。</p>
+<p>数据格式:</p>
+<p>[body.novel.data]</p>
+<p>id: string 小说ID</p>
+<p>title: string 标题</p>
+<p>url: string 封面 URL</p>
+<p>tags: string[] 标签</p>
+<p>userId: string 作者ID</p>
+<p>userName: string 作者名</p>
+<p>textCount: number 字数</p>
+<p>description</p>
+<blockquote>
+<div><p>类型: string</p>
+<p>作品描述HTML。</p>
+</div></blockquote>
+<p>bookmarkCount: number 收藏数</p>
+<p>seriesId</p>
+<blockquote>
+<div><p>类型: string | undefined</p>
+<p>系列ID</p>
+</div></blockquote>
+<p>seriesTitle</p>
+<blockquote>
+<div><p>类型: string | undefined</p>
+<p>系列标题</p>
+</div></blockquote>
+</div>
+
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="index.html">pixiv go client</a></h1>
+
+
+
+<p class="blurb">pixiv go 客户端</p>
+
+
+
+
+<p>
+<iframe src="https://ghbtns.com/github-btn.html?user=NateScarlet&repo=pixiv&type=watch&count=true&size=large&v=2"
+  allowtransparency="true" frameborder="0" scrolling="0" width="200px" height="35px"></iframe>
+</p>
+
+
+
+
+
+<h3>导航</h3>
+<p class="caption"><span class="caption-text">内容:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="auth.html">授权</a></li>
+<li class="toctree-l1"><a class="reference internal" href="artwork.html">画作详情</a></li>
+<li class="toctree-l1"><a class="reference internal" href="artwork.html#id2">画作分页详情</a></li>
+<li class="toctree-l1"><a class="reference internal" href="artwork_search.html">画作搜索</a></li>
+<li class="toctree-l1"><a class="reference internal" href="artwork_rank.html">画作排行</a></li>
+<li class="toctree-l1"><a class="reference internal" href="novel.html">小说详情</a></li>
+<li class="toctree-l1"><a class="reference internal" href="novel.html#id2">小说插图</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">小说搜索</a></li>
+<li class="toctree-l1"><a class="reference internal" href="novel_rank.html">画作排行</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user.html">用户详情</a></li>
+<li class="toctree-l1"><a class="reference internal" href="env-vars.html">环境变量</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="index.html">Documentation overview</a><ul>
+      <li>Previous: <a href="novel.html" title="上一章">小说详情</a></li>
+      <li>Next: <a href="novel_rank.html" title="下一章">画作排行</a></li>
+  </ul></li>
+</ul>
+</div>
+<div id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">快速搜索</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" />
+      <input type="submit" value="转向" />
+    </form>
+    </div>
+</div>
+<script type="text/javascript">$('#searchbox').show(0);</script>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &copy;2019, NateScarlet.
+      
+      |
+      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.3.1</a>
+      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
+      
+      |
+      <a href="_sources/novel_search.rst.txt"
+          rel="nofollow">Page source</a>
+    </div>
+
+    
+
+    
+  </body>
+</html>
