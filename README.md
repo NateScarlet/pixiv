@@ -28,7 +28,7 @@ err := i.FetchPages() // 获取画作分页, 直接更新 struct 数据。
 // 搜索小说
 result, err := client.SearchNovel("パチュリー・ノーレッジ", 1)
 result.JSON // json return data.
-result.Novel() // []client.Novel，只有部分数据，通过 `Fetch` 方法获取完整数据。
+result.Novels() // []client.Novel，只有部分数据，通过 `Fetch` 方法获取完整数据。
 
 // 小说详情
 i := Novel{ID: "11983096"}
