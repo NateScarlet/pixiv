@@ -14,7 +14,8 @@ func TestSearchArtwork(t *testing.T) {
 	t.Log(data.Raw)
 	assert.Equal(t, false, data.Get("error").Bool())
 	assert.Empty(t, data.Get("message"))
-	assert.Equal(t, int64(60), data.Get("illustManga.data.#").Int())
+	dataCount := data.Get("illustManga.data.#").Int()
+	assert.GreaterOrEqual(t, dataCount, int64(40))
 	count := 0
 	result.ForEach(func(key, value gjson.Result) bool {
 		count++
@@ -22,8 +23,8 @@ func TestSearchArtwork(t *testing.T) {
 		assert.NotEmpty(t, value.Get("illustId"))
 		return true
 	})
-	assert.LessOrEqual(t, 59, count)
-	assert.LessOrEqual(t, count, 60)
+	assert.GreaterOrEqual(t, count, 40)
+	assert.LessOrEqual(t, count, dataCount)
 	artworks := result.Artworks()
 	assert.Len(t, artworks, count)
 	for _, i := range artworks {
