@@ -11,15 +11,15 @@ func TestSearchArtwork(t *testing.T) {
 	result, err := SearchArtwork("パチュリー・ノーレッジ", 1)
 	assert.NoError(t, err)
 	data := result.JSON
-	t.Log(data.Raw)
+	// t.Log(data.Raw)
 	assert.Equal(t, false, data.Get("error").Bool())
 	assert.Empty(t, data.Get("message"))
-	dataCount := data.Get("illustManga.data.#").Int()
-	assert.GreaterOrEqual(t, dataCount, int64(40))
+	dataCount := int(data.Get("illustManga.data.#").Int())
+	assert.GreaterOrEqual(t, dataCount, 40)
 	count := 0
 	result.ForEach(func(key, value gjson.Result) bool {
 		count++
-		t.Log(key, value)
+		// t.Log(key, value)
 		assert.NotEmpty(t, value.Get("illustId"))
 		return true
 	})
