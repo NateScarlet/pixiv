@@ -44,6 +44,19 @@ func httpGetDocument(url string) (doc *goquery.Document, err error) {
 	return
 }
 
+func httpGetJSON(url string) (payload gjson.Result, err error) {
+	bytes, err := httpGetBytes(url)
+	if err != nil {
+		return
+	}
+	payload = gjson.ParseBytes(bytes)
+	if !gjson.Valid(payload.Raw) {
+		err = fmt.Errorf("invalid json: %s", payload.Raw)
+		return
+	}
+	return
+}
+
 func validateAPIPayload(payload gjson.Result) error {
 	if !gjson.Valid(payload.Raw) {
 		return fmt.Errorf("Pixiv api error: invalid json: %s", payload.Raw)
