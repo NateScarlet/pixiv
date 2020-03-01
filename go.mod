@@ -7,7 +7,7 @@ require (
 	github.com/cenkalti/backoff v2.2.1+incompatible // indirect
 	github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e // indirect
 	github.com/joho/godotenv v1.3.0
-	github.com/stretchr/testify v1.4.0
+	github.com/stretchr/testify v1.5.1
 	github.com/tidwall/gjson v1.3.5
 	go.uber.org/zap v1.14.0 // indirect
 	golang.org/x/net v0.0.0-20191126235420-ef20fe5d7933
