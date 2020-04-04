@@ -1,71 +1,22 @@
 package client
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net/http"
 	"net/http/cookiejar"
 	"net/url"
-	"os"
-	"sync"
 
-	"golang.org/x/net/publicsuffix"
+	"github.com/PuerkitoBio/goquery"
 )
-
-var cookieJar, _ = cookiejar.New(&cookiejar.Options{PublicSuffixList: publicsuffix.List})
-
-var client = &http.Client{Jar: cookieJar}
-
-// HTTPClient for custom request with session.
-var HTTPClient = client
-var loginMu = &sync.Mutex{}
-
-// LoginFromEnv login when account configured and not logged in
-func LoginFromEnv() error {
-	loginMu.Lock()
-	defer loginMu.Unlock()
-
-	// Use `PHPSESSID`
-	phpsessid := os.Getenv("PIXIV_PHPSESSID")
-	if phpsessid != "" {
-		client.Jar.SetCookies(SiteURL(""),
-			[]*http.Cookie{&http.Cookie{
-				Domain: ".pixiv.net",
-				Path:   "/",
-				Name:   "PHPSESSID",
-				Value:  phpsessid,
-			}})
-	}
-
-	// Use username and password.
-	username := os.Getenv("PIXIV_USER")
-	password := os.Getenv("PIXIV_PASSWORD")
-
-	if username == "" || password == "" {
-		return nil
-	}
-	loggedIn, err := IsLoggedIn()
-	if err != nil {
-		return err
-	}
-	if loggedIn {
-		return nil
-	}
-	return Login(username, password)
-}
 
 // IsLoggedIn checks login status base on `HEAD https://www.pixiv.net/setting_user.php`
 // response status.
-func IsLoggedIn() (ret bool, err error) {
-	c := &http.Client{
-		Jar: client.Jar,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
+func (c Client) IsLoggedIn() (ret bool, err error) {
+	c.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
 	}
-	resp, err := c.Head(SiteURL("/setting_user.php").String())
+	resp, err := c.Head(c.EndpointURL("/setting_user.php", nil).String())
 	if err != nil {
 		return
 	}
@@ -79,9 +30,23 @@ func IsLoggedIn() (ret bool, err error) {
 	return false, errors.New("unexpected response for login test")
 }
 
-// Login pixiv
-func Login(username string, password string) (err error) {
-	doc, err := httpGetDocument("https://accounts.pixiv.net/login?lang=zh")
+func (c *Client) ensureJar() {
+	if c.Jar == nil {
+		c.Jar, _ = cookiejar.New(nil)
+	}
+}
+
+// Login with username and password
+func (c *Client) Login(username string, password string) (err error) {
+	c.ensureJar()
+
+	// Get post key
+	resp, err := c.Get("https://accounts.pixiv.net/login?lang=zh")
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
 		return
 	}
@@ -96,7 +61,8 @@ func Login(username string, password string) (err error) {
 		return
 	}
 
-	resp, err := client.PostForm("https://accounts.pixiv.net/api/login?lang=zh",
+	// post
+	resp, err = c.PostForm("https://accounts.pixiv.net/api/login?lang=zh",
 		url.Values{
 			"pixiv_id": []string{username},
 			"password": []string{password},
@@ -107,20 +73,27 @@ func Login(username string, password string) (err error) {
 	}
 	defer resp.Body.Close()
 
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := ParseAPIResult(resp.Body)
 	if err != nil {
 		return
 	}
-	var result struct {
-		Body    map[string]interface{} `json:"body"`
-		Error   bool                   `json:"error"`
-		Message string                 `json:"message"`
+	if !body.Get("success").Exists() {
+		err = fmt.Errorf("login failed: %+v", body.String())
 	}
-	json.Unmarshal(body, &result)
-	if result.Body["success"] == nil {
-		err = fmt.Errorf("Login failed: %+v", result)
-		return
-	}
-
 	return
+}
+
+// SetPHPSESSID set client cookie to skip login.
+func (c *Client) SetPHPSESSID(v string) {
+	c.ensureJar()
+
+	c.Jar.SetCookies(
+		c.EndpointURL("", nil),
+		[]*http.Cookie{&http.Cookie{
+			Domain: ".pixiv.net",
+			Path:   "/",
+			Name:   "PHPSESSID",
+			Value:  v,
+		}},
+	)
 }

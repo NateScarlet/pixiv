@@ -1,16 +1,22 @@
-package client
+package artwork
 
 import (
+	"net/url"
+	"strconv"
+
+	"github.com/NateScarlet/pixiv/pkg/client"
+	"github.com/NateScarlet/pixiv/pkg/image"
+	"github.com/NateScarlet/pixiv/pkg/user"
 	"github.com/tidwall/gjson"
 )
 
-// ArtworkSearchResult holds search data and provide useful methods.
-type ArtworkSearchResult struct {
+// SearchResult holds search data and provide useful methods.
+type SearchResult struct {
 	JSON gjson.Result
 }
 
 // ForEach iterates through values. skips advertisement container item.
-func (r ArtworkSearchResult) ForEach(iterator func(key gjson.Result, value gjson.Result) bool) {
+func (r SearchResult) ForEach(iterator func(key gjson.Result, value gjson.Result) bool) {
 	r.JSON.Get("illustManga.data").ForEach(func(key gjson.Result, value gjson.Result) bool {
 		if value.Get("isAdContainer").Bool() {
 			return true
@@ -21,22 +27,22 @@ func (r ArtworkSearchResult) ForEach(iterator func(key gjson.Result, value gjson
 }
 
 // Artworks appeared in search result.
-func (r ArtworkSearchResult) Artworks() []Artwork {
+func (r SearchResult) Artworks() []Artwork {
 	ret := []Artwork{}
 	r.ForEach(func(key, value gjson.Result) bool {
 		a := Artwork{
 			ID:    value.Get("illustId").String(),
 			Title: value.Get("illustTitle").String(),
 			Type:  value.Get("illustType").String(),
-			Author: User{
+			Author: user.User{
 				ID:   value.Get("userId").String(),
 				Name: value.Get("userName").String(),
-				AvatarURLs: ImageURLs{
+				AvatarURLs: image.URLs{
 					Mini: value.Get("profileImageUrl").String(),
 				},
 			},
 			Description: value.Get("description").String(),
-			URLs: ImageURLs{
+			URLs: image.URLs{
 				Thumb: value.Get("url").String(),
 			},
 			PageCount: value.Get("pageCount").Int(),
@@ -54,18 +60,30 @@ func (r ArtworkSearchResult) Artworks() []Artwork {
 
 }
 
-// SearchArtwork calls pixiv artwork search api.
-func SearchArtwork(query string, page int) (result ArtworkSearchResult, err error) {
-	u := APIArtworkSearchURL(query, page)
-	resp, err := httpGetBytes(u.String())
+// SearchWithClient do search with given client.
+func SearchWithClient(c client.Client, query string, page int) (result SearchResult, err error) {
+	resp, err := c.Get(c.EndpointURL(
+		"/ajax/search/artworks/"+query,
+		&url.Values{
+			"p": []string{strconv.Itoa(page)},
+		},
+	).String())
+
 	if err != nil {
 		return
 	}
-
-	payload := gjson.ParseBytes(resp)
-	err = validateAPIPayload(payload)
-	result = ArtworkSearchResult{
-		JSON: payload.Get("body"),
+	defer resp.Body.Close()
+	body, err := client.ParseAPIResult(resp.Body)
+	if err != nil {
+		return
+	}
+	result = SearchResult{
+		JSON: body,
 	}
 	return
+}
+
+// Search calls pixiv artwork search api.
+func Search(query string, page int) (result SearchResult, err error) {
+	return SearchWithClient(*client.Default, query, page)
 }

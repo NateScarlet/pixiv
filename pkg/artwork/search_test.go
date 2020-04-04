@@ -1,4 +1,4 @@
-package client
+package artwork
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 )
 
 func TestSearchArtwork(t *testing.T) {
-	result, err := SearchArtwork("パチュリー・ノーレッジ", 1)
+	result, err := Search("パチュリー・ノーレッジ", 1)
 	assert.NoError(t, err)
 	data := result.JSON
 	// t.Log(data.Raw)

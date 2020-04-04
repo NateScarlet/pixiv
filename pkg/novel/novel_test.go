@@ -1,6 +1,7 @@
-package client
+package novel
 
 import (
+	"os"
 	"testing"
 	"time"
 
@@ -8,8 +9,10 @@ import (
 )
 
 func TestFetchNovel(t *testing.T) {
-	getCredential(t)
-	LoginFromEnv()
+	if os.Getenv("PIXIV_PHPSESSID") == "" {
+		t.Skip("need login")
+		return
+	}
 	i := Novel{ID: "11983096"}
 	err := i.Fetch()
 	assert.NoError(t, err)

@@ -1,4 +1,4 @@
-package client
+package novel
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 )
 
 func TestSearchNovel(t *testing.T) {
-	result, err := SearchNovel("パチュリー・ノーレッジ", 1)
+	result, err := Search("パチュリー・ノーレッジ", 1)
 	assert.NoError(t, err)
 	data := result.JSON
 	t.Log(data.Raw)

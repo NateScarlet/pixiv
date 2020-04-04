@@ -1,4 +1,4 @@
-package client
+package artwork
 
 import (
 	"testing"
@@ -10,11 +10,10 @@ import (
 func TestArtworkRankSimple(t *testing.T) {
 	date, err := time.Parse(time.RFC3339, "2020-01-01T00:00:00+00:00")
 	assert.NoError(t, err)
-	rank := &ArtworkRank{
+	rank := &Rank{
 		Mode: "daily",
 		Date: date,
 	}
-	assert.Equal(t, "https://www.pixiv.net/ranking.php?date=20200101&mode=daily", rank.URL().String())
 	err = rank.Fetch()
 	assert.NoError(t, err)
 	assert.GreaterOrEqual(t, len(rank.Items), 49)

@@ -1,14 +1,15 @@
-package client
+package novel
 
 import (
 	"errors"
 	"time"
 
-	"github.com/tidwall/gjson"
+	"github.com/NateScarlet/pixiv/pkg/client"
+	"github.com/NateScarlet/pixiv/pkg/user"
 )
 
-// NovelSeries data
-type NovelSeries struct {
+// Series data
+type Series struct {
 	ID    string
 	Title string
 }
@@ -22,8 +23,8 @@ type Novel struct {
 	Content     string
 	Created     time.Time
 	Uploaded    time.Time
-	Author      User
-	Series      NovelSeries
+	Author      user.User
+	Series      Series
 	Tags        []string
 
 	TextCount     int64
@@ -36,25 +37,23 @@ type Novel struct {
 	isFetched bool
 }
 
-// Fetch additional data from pixiv single novel api (require login),
-// only fetch once for same struct.
-func (i *Novel) Fetch() (err error) {
+// FetchWithClient do request with given client.
+func (i *Novel) FetchWithClient(c client.Client) (err error) {
 	if i.isFetched {
 		return
 	}
 	if i.ID == "" {
 		return errors.New("no novel id specified")
 	}
-	resp, err := httpGetBytes(APINovelURL(i.ID).String())
+	resp, err := c.Get(c.EndpointURL("/ajax/novel/"+i.ID, nil).String())
 	if err != nil {
 		return
 	}
-	payload := gjson.ParseBytes(resp)
-	err = validateAPIPayload(payload)
+	defer resp.Body.Close()
+	data, err := client.ParseAPIResult(resp.Body)
 	if err != nil {
 		return
 	}
-	data := payload.Get("body")
 	i.Title = data.Get("title").String()
 	i.Description = data.Get("description").String()
 	i.CoverURL = data.Get("coverUrl").String()
@@ -76,4 +75,10 @@ func (i *Novel) Fetch() (err error) {
 
 	i.isFetched = true
 	return
+}
+
+// Fetch additional data from pixiv single novel api (require login),
+// only fetch once for same struct.
+func (i *Novel) Fetch() (err error) {
+	return i.FetchWithClient(*client.Default)
 }

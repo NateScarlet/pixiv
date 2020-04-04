@@ -1,17 +1,18 @@
-package client
+package artwork
 
 import (
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFetchArtwork(t *testing.T) {
 	i := Artwork{ID: "22238487"}
 	err := i.Fetch()
 	t.Log(i)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "22238487", i.ID)
 	assert.Equal(t, "無題", i.Title)
 	assert.Len(t, i.Tags, 2)
@@ -27,10 +28,10 @@ func TestFetchArtwork(t *testing.T) {
 	assert.LessOrEqual(t, int64(12), i.BookmarkCount)
 }
 
-func TestFetchArtworkPages(t *testing.T) {
+func TestFetchPages(t *testing.T) {
 	i := Artwork{ID: "52200823"}
 	err := i.FetchPages()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	t.Log(i)
 	assert.Equal(t, "52200823", i.ID)
 	assert.Len(t, i.Pages, 3)
