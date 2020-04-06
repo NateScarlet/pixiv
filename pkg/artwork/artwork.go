@@ -12,7 +12,7 @@ import (
 
 // Page is a artwork page.
 type Page struct {
-	URLs   image.URLs
+	Image  image.URLs
 	Width  int64
 	Height int64
 }
@@ -113,11 +113,11 @@ func (i *Artwork) FetchPagesWithClient(c client.Client) (err error) {
 	pages := make([]Page, 0, int(data.Get("#").Int()))
 	data.ForEach(func(key, value gjson.Result) bool {
 		i := Page{}
-		i.URLs.Mini = value.Get("urls.thumb_mini").String()
-		i.URLs.Thumb = i.URLs.Mini
-		i.URLs.Small = value.Get("urls.small").String()
-		i.URLs.Regular = value.Get("urls.regular").String()
-		i.URLs.Original = value.Get("urls.original").String()
+		i.Image.Mini = value.Get("urls.thumb_mini").String()
+		i.Image.Thumb = i.Image.Mini
+		i.Image.Small = value.Get("urls.small").String()
+		i.Image.Regular = value.Get("urls.regular").String()
+		i.Image.Original = value.Get("urls.original").String()
 		i.Width = value.Get("width").Int()
 		i.Height = value.Get("height").Int()
 		pages = append(pages, i)

@@ -36,11 +36,11 @@ func TestFetchPages(t *testing.T) {
 	assert.Equal(t, "52200823", i.ID)
 	assert.Len(t, i.Pages, 3)
 	for _, i := range i.Pages {
-		assert.NotEmpty(t, i.URLs.Mini)
-		assert.NotEmpty(t, i.URLs.Thumb)
-		assert.NotEmpty(t, i.URLs.Small)
-		assert.NotEmpty(t, i.URLs.Regular)
-		assert.NotEmpty(t, i.URLs.Original)
+		assert.NotEmpty(t, i.Image.Mini)
+		assert.NotEmpty(t, i.Image.Thumb)
+		assert.NotEmpty(t, i.Image.Small)
+		assert.NotEmpty(t, i.Image.Regular)
+		assert.NotEmpty(t, i.Image.Original)
 		assert.NotEmpty(t, i.Width)
 		assert.NotEmpty(t, i.Height)
 	}
