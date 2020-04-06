@@ -2,6 +2,7 @@ package user
 
 import (
 	"errors"
+	"net/url"
 
 	"github.com/NateScarlet/pixiv/pkg/client"
 	"github.com/NateScarlet/pixiv/pkg/image"
@@ -44,4 +45,14 @@ func (i *User) FetchWithClient(c client.Client) (err error) {
 // only fetch once for same struct.
 func (i *User) Fetch() (err error) {
 	return i.FetchWithClient(*client.Default)
+}
+
+// URLWithClient to view web page.
+func (i User) URLWithClient(c client.Client) *url.URL {
+	return c.EndpointURL("/users/"+i.ID, nil)
+}
+
+// URL to view web page.
+func (i User) URL() *url.URL {
+	return i.URLWithClient(*client.Default)
 }

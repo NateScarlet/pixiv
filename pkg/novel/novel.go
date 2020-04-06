@@ -2,6 +2,7 @@ package novel
 
 import (
 	"errors"
+	"net/url"
 	"time"
 
 	"github.com/NateScarlet/pixiv/pkg/client"
@@ -12,6 +13,16 @@ import (
 type Series struct {
 	ID    string
 	Title string
+}
+
+// URLWithClient to view web page.
+func (i Series) URLWithClient(c client.Client) *url.URL {
+	return c.EndpointURL("/novel/series/"+i.ID, nil)
+}
+
+// URL to view web page.
+func (i Series) URL() *url.URL {
+	return i.URLWithClient(*client.Default)
 }
 
 // Novel data
@@ -81,4 +92,14 @@ func (i *Novel) FetchWithClient(c client.Client) (err error) {
 // only fetch once for same struct.
 func (i *Novel) Fetch() (err error) {
 	return i.FetchWithClient(*client.Default)
+}
+
+// URLWithClient to view web page.
+func (i Novel) URLWithClient(c client.Client) *url.URL {
+	return c.EndpointURL("/novel/show.php", &url.Values{"id": {i.ID}})
+}
+
+// URL to view web page.
+func (i Novel) URL() *url.URL {
+	return i.URLWithClient(*client.Default)
 }

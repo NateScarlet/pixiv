@@ -26,6 +26,7 @@ func TestFetchArtwork(t *testing.T) {
 	assert.LessOrEqual(t, int64(54), i.LikeCount)
 	assert.LessOrEqual(t, int64(899), i.ViewCount)
 	assert.LessOrEqual(t, int64(12), i.BookmarkCount)
+	assert.Equal(t, "https://www.pixiv.net/artworks/22238487", i.URL().String())
 }
 
 func TestFetchPages(t *testing.T) {

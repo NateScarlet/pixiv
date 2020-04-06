@@ -2,6 +2,7 @@ package artwork
 
 import (
 	"errors"
+	"net/url"
 	"time"
 
 	"github.com/NateScarlet/pixiv/pkg/client"
@@ -132,4 +133,14 @@ func (i *Artwork) FetchPagesWithClient(c client.Client) (err error) {
 // only fetch once for same struct.
 func (i *Artwork) FetchPages() (err error) {
 	return i.FetchPagesWithClient(*client.Default)
+}
+
+// URLWithClient to view artwork web page.
+func (i Artwork) URLWithClient(c client.Client) *url.URL {
+	return c.EndpointURL("/artworks/"+i.ID, nil)
+}
+
+// URL to view artwork web page.
+func (i Artwork) URL() *url.URL {
+	return i.URLWithClient(*client.Default)
 }
