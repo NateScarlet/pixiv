@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.3.1](https://github.com/NateScarlet/pixiv/compare/v0.3.0...v0.3.1) (2020-04-06)
+
+
+### Features
+
+* add artwork.Rank.URL method ([ff172a4](https://github.com/NateScarlet/pixiv/commit/ff172a4c984ab19d62667645b53d75c6fdf014c5))
+
 ## [0.3.0](https://github.com/NateScarlet/pixiv/compare/v0.2.0...v0.3.0) (2020-04-06)
 
 
