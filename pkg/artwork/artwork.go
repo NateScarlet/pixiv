@@ -23,7 +23,7 @@ type Artwork struct {
 	Title       string
 	Type        string
 	Description string
-	URLs        image.URLs
+	Image       image.URLs
 	Created     time.Time
 	Tags        []string
 	Author      user.User
@@ -63,11 +63,11 @@ func (i *Artwork) FetchWithClient(c client.Client) (err error) {
 	i.Title = body.Get("illustTitle").String()
 	i.Type = body.Get("illustType").String()
 	i.Description = body.Get("description").String()
-	i.URLs.Mini = body.Get("urls.mini").String()
-	i.URLs.Thumb = body.Get("urls.thumb").String()
-	i.URLs.Small = body.Get("urls.small").String()
-	i.URLs.Regular = body.Get("urls.regular").String()
-	i.URLs.Original = body.Get("urls.original").String()
+	i.Image.Mini = body.Get("urls.mini").String()
+	i.Image.Thumb = body.Get("urls.thumb").String()
+	i.Image.Small = body.Get("urls.small").String()
+	i.Image.Regular = body.Get("urls.regular").String()
+	i.Image.Original = body.Get("urls.original").String()
 	i.Created = body.Get("createDate").Time()
 	i.Author.ID = body.Get("userId").String()
 	i.Author.Name = body.Get("userName").String()

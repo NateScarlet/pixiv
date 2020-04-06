@@ -85,7 +85,7 @@ func (rank *Rank) FetchWithClient(c client.Client) (err error) {
 			i.Artwork.Width = v.Get("width").Int()
 			i.Artwork.Height = v.Get("height").Int()
 			i.Artwork.Created = time.Unix(v.Get("illust_upload_timestamp").Int(), 0)
-			i.URLs.Regular = v.Get("url").String()
+			i.Image.Regular = v.Get("url").String()
 			i.Author.ID = v.Get("user_id").String()
 			i.Author.ID = v.Get("user_name").String()
 			i.Author.Name = v.Get("user_id").String()

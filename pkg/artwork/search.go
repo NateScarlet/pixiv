@@ -42,7 +42,7 @@ func (r SearchResult) Artworks() []Artwork {
 				},
 			},
 			Description: value.Get("description").String(),
-			URLs: image.URLs{
+			Image: image.URLs{
 				Thumb: value.Get("url").String(),
 			},
 			PageCount: value.Get("pageCount").Int(),
