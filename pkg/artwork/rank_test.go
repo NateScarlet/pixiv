@@ -25,6 +25,6 @@ func TestArtworkRankSimple(t *testing.T) {
 		assert.NotEmpty(t, item.Artwork.Image.Regular)
 		assert.NotEmpty(t, item.Artwork.Author.ID)
 		assert.NotEmpty(t, item.Artwork.Author.Name)
-		assert.NotEmpty(t, item.Artwork.Author.AvatarURLs.Mini)
+		assert.NotEmpty(t, item.Artwork.Author.Avatar.Mini)
 	}
 }

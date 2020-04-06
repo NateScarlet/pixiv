@@ -13,6 +13,6 @@ func TestFetchUser(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "789096", i.ID)
 	assert.Equal(t, "CHN^NateScarlet", i.Name)
-	assert.NotEmpty(t, i.AvatarURLs.Mini)
-	assert.NotEmpty(t, i.AvatarURLs.Thumb)
+	assert.NotEmpty(t, i.Avatar.Mini)
+	assert.NotEmpty(t, i.Avatar.Thumb)
 }

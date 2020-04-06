@@ -37,7 +37,7 @@ func (r SearchResult) Artworks() []Artwork {
 			Author: user.User{
 				ID:   value.Get("userId").String(),
 				Name: value.Get("userName").String(),
-				AvatarURLs: image.URLs{
+				Avatar: image.URLs{
 					Mini: value.Get("profileImageUrl").String(),
 				},
 			},

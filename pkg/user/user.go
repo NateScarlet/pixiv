@@ -9,9 +9,9 @@ import (
 
 // User data.
 type User struct {
-	ID         string
-	Name       string
-	AvatarURLs image.URLs
+	ID     string
+	Name   string
+	Avatar image.URLs
 
 	isFetched bool
 }
@@ -34,8 +34,8 @@ func (i *User) FetchWithClient(c client.Client) (err error) {
 		return
 	}
 	i.Name = body.Get("name").String()
-	i.AvatarURLs.Mini = body.Get("image").String()
-	i.AvatarURLs.Thumb = body.Get("imageBig").String()
+	i.Avatar.Mini = body.Get("image").String()
+	i.Avatar.Thumb = body.Get("imageBig").String()
 	i.isFetched = true
 	return
 }

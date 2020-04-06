@@ -89,7 +89,7 @@ func (rank *Rank) FetchWithClient(c client.Client) (err error) {
 			i.Author.ID = v.Get("user_id").String()
 			i.Author.ID = v.Get("user_name").String()
 			i.Author.Name = v.Get("user_id").String()
-			i.Author.AvatarURLs.Mini = v.Get("profile_img").String()
+			i.Author.Avatar.Mini = v.Get("profile_img").String()
 			i.PageCount = v.Get("illust_page_count").Int()
 			items = append(items, i)
 			return true
