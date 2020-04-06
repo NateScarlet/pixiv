@@ -7,6 +7,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestRankURL(t *testing.T) {
+	date, err := time.Parse(time.RFC3339, "2020-01-01T00:00:00+00:00")
+	assert.NoError(t, err)
+	assert.Equal(t, "https://www.pixiv.net/ranking.php", Rank{Mode: "daily"}.URL().String())
+	assert.Equal(t, "https://www.pixiv.net/ranking.php?mode=weekly", Rank{Mode: "weekly"}.URL().String())
+	assert.Equal(t, "https://www.pixiv.net/ranking.php?date=20200101&mode=weekly", Rank{Mode: "weekly", Date: date}.URL().String())
+	assert.Equal(t, "https://www.pixiv.net/ranking.php?content=manga&date=20200101&mode=weekly", Rank{Mode: "weekly", Content: "manga", Date: date}.URL().String())
+}
+
 func TestArtworkRankSimple(t *testing.T) {
 	date, err := time.Parse(time.RFC3339, "2020-01-01T00:00:00+00:00")
 	assert.NoError(t, err)

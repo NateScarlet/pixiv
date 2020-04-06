@@ -22,7 +22,7 @@ type RankItem struct {
 // Rank contains data for one rank page.
 type Rank struct {
 	/* required, possible rank modes:
-		- daily
+		- daily (default)
 	    - weekly
 	    - monthly
 	    - rookie
@@ -48,11 +48,14 @@ type Rank struct {
 	Items   []RankItem
 }
 
-// FetchWithClient do request with given client
-func (rank *Rank) FetchWithClient(c client.Client) (err error) {
-	q := url.Values{}
-	q.Set("format", "json")
-	q.Set("mode", rank.Mode)
+// URLWithClient to rank page.
+func (rank Rank) URLWithClient(c client.Client, q *url.Values) *url.URL {
+	if q == nil {
+		q = &url.Values{}
+	}
+	if rank.Mode != "" && rank.Mode != "daily" {
+		q.Set("mode", rank.Mode)
+	}
 	if rank.Content != "" {
 		q.Set("content", rank.Content)
 	}
@@ -62,7 +65,17 @@ func (rank *Rank) FetchWithClient(c client.Client) (err error) {
 	if rank.Page > 1 {
 		q.Set("p", strconv.Itoa(rank.Page))
 	}
-	resp, err := c.Get(c.EndpointURL("/ranking.php", &q).String())
+	return c.EndpointURL("/ranking.php", q)
+}
+
+// URL to rank page.
+func (rank Rank) URL() *url.URL {
+	return rank.URLWithClient(*client.Default, nil)
+}
+
+// FetchWithClient do request with given client
+func (rank *Rank) FetchWithClient(c client.Client) (err error) {
+	resp, err := c.Get(rank.URLWithClient(c, &url.Values{"format": {"json"}}).String())
 	if err != nil {
 		return
 	}
