@@ -19,7 +19,7 @@ func TestSearchNovel(t *testing.T) {
 		return true
 	})
 	novels := result.Novels()
-	assert.GreaterOrEqual(t, len(novels), 23)
+	assert.GreaterOrEqual(t, len(novels), 21)
 	for _, i := range novels {
 		assert.NotEmpty(t, i.ID)
 		assert.NotEmpty(t, i.Tags)
