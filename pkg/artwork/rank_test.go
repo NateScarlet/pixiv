@@ -25,7 +25,7 @@ func TestArtworkRankSimple(t *testing.T) {
 	}
 	err = rank.Fetch()
 	assert.NoError(t, err)
-	assert.GreaterOrEqual(t, len(rank.Items), 49)
+	assert.GreaterOrEqual(t, len(rank.Items), 48)
 	for _, item := range rank.Items {
 		assert.NotEmpty(t, item.Rank)
 		assert.NotEmpty(t, item.Artwork.ID)
