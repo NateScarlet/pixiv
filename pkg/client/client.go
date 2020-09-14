@@ -38,12 +38,21 @@ func GetRealIp() string {
 	return paraseDns.Answer[0].Data
 }
 
+var realip = ""
+
 // EndpointURL returns url for server endpint.
 func (c Client) EndpointURL(path string, values *url.Values) *url.URL {
 	s := c.ServerURL
 	if s == "" {
-		ip := GetRealIp()
-		s = fmt.Sprintf("https://%s", ip)
+		if bypass {
+			if realip == "" {
+				realip = GetRealIp()
+			}
+			ip := realip
+			s = fmt.Sprintf("https://%s", ip)
+		} else {
+			s = "https://www.pixiv.net"
+		}
 	}
 
 	u, err := url.Parse(s)
@@ -79,9 +88,11 @@ func ParseAPIResult(r io.Reader) (ret gjson.Result, err error) {
 }
 
 // Default client auto login with PIXIV_PHPSESSID env var.
-var Default = NewClient(true)
+var Default = NewClient(false)
+var bypass bool
 
 func NewClient(isBypass bool) *Client {
+	bypass = isBypass
 	if isBypass {
 		return &Client{
 			Client: http.Client{
@@ -98,12 +109,18 @@ func NewClient(isBypass bool) *Client {
 	}
 }
 
+func SetDefaultToBypass() {
+	Default = NewClient(true)
+}
+
 func (c *Client) Get(url string) (resp *http.Response, err error) {
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Host = "www.pixiv.net"
+	if bypass {
+		req.Host = "www.pixiv.net"
+	}
 	return c.Do(req)
 }
 

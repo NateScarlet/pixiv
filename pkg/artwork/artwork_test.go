@@ -1,6 +1,7 @@
 package artwork
 
 import (
+	"github.com/NateScarlet/pixiv/pkg/client"
 	"testing"
 	"time"
 
@@ -9,6 +10,9 @@ import (
 )
 
 func TestFetchArtwork(t *testing.T) {
+	// set Bypass
+	client.SetDefaultToBypass()
+
 	i := Artwork{ID: "22238487"}
 	err := i.Fetch()
 	t.Log(i)
@@ -27,8 +31,8 @@ func TestFetchArtwork(t *testing.T) {
 	assert.LessOrEqual(t, int64(899), i.ViewCount)
 	assert.LessOrEqual(t, int64(12), i.BookmarkCount)
 
-	// when Client use bypass==ture, actual url will become ip/api instead of domain/api
-	// assert.Equal(t, "https://www.pixiv.net/artworks/22238487", i.URL().String())
+	// when Client use SetDefaultToBypass(), actual url will become ip/api instead of domain/api
+	//assert.Equal(t, "https://www.pixiv.net/artworks/22238487", i.URL().String())
 }
 
 func TestFetchPages(t *testing.T) {
