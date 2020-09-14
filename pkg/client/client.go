@@ -1,6 +1,8 @@
 package client
 
 import (
+	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -17,11 +19,31 @@ type Client struct {
 	http.Client
 }
 
+type dns struct {
+	Answer []struct {
+		Name string `json:"name"`
+		Data string `json:"data"`
+	} `json:"Answer"`
+}
+
+func GetRealIp() string {
+	res, err := http.Get("https://1.1.1.1/dns-query?ct=application/dns-json&name=pixiv.net&type=A")
+	if err != nil {
+		println(err.Error())
+		return ""
+	}
+	var paraseDns dns
+	data, _ := ioutil.ReadAll(res.Body)
+	_ = json.Unmarshal(data, &paraseDns)
+	return paraseDns.Answer[0].Data
+}
+
 // EndpointURL returns url for server endpint.
 func (c Client) EndpointURL(path string, values *url.Values) *url.URL {
 	s := c.ServerURL
 	if s == "" {
-		s = "https://www.pixiv.net"
+		ip := GetRealIp()
+		s = fmt.Sprintf("https://%s", ip)
 	}
 
 	u, err := url.Parse(s)
@@ -57,7 +79,44 @@ func ParseAPIResult(r io.Reader) (ret gjson.Result, err error) {
 }
 
 // Default client auto login with PIXIV_PHPSESSID env var.
-var Default = &Client{}
+var Default = NewClient(true)
+
+func NewClient(isBypass bool) *Client {
+	if isBypass {
+		return &Client{
+			Client: http.Client{
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{
+						InsecureSkipVerify: true,
+					},
+				},
+			},
+			ServerURL: fmt.Sprintf("https://%s", GetRealIp()),
+		}
+	} else {
+		return &Client{}
+	}
+}
+
+func (c *Client) Get(url string) (resp *http.Response, err error) {
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Host = "www.pixiv.net"
+	return c.Do(req)
+}
+
+func (c *Client) Download(url string, id string) (resp *http.Response, err error) {
+	ref := "https://www.pixiv.net/artworks/%s" + id
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Add("Referer", "")
+	req.Header.Set("Referer", ref)
+	return c.Do(req)
+}
 
 func init() {
 	Default.SetPHPSESSID(os.Getenv("PIXIV_PHPSESSID"))

@@ -2,6 +2,7 @@ package artwork
 
 import (
 	"errors"
+	"io/ioutil"
 	"net/url"
 	"time"
 
@@ -143,4 +144,19 @@ func (i Artwork) URLWithClient(c client.Client) *url.URL {
 // URL to view artwork web page.
 func (i Artwork) URL() *url.URL {
 	return i.URLWithClient(*client.Default)
+}
+
+func (i Artwork) Download(url string, path string) {
+	resp, _ := client.Default.Download(url, i.ID)
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		println(err.Error())
+		return
+	}
+	if WriteErr := ioutil.WriteFile(path, body, 0755); WriteErr != nil {
+		println(WriteErr.Error())
+		return
+	}
 }
