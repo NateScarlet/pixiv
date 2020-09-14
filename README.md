@@ -19,7 +19,6 @@ import (
 )
 
 // 默认客户端用环境变量 `PIXIV_PHPSESSID` 登录。
-// 默认启用免代理设置
 // 默认使用默认客户端, 所有查询都有 *WithClient 版本指定客户端。
 client.Default
 
