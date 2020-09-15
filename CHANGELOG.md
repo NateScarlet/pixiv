@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.3.4](https://github.com/NateScarlet/pixiv/compare/v0.3.3...v0.3.4) (2020-09-15)
+
+
+### Features
+
+* add client.DNSQueryURL config ([8f53ffc](https://github.com/NateScarlet/pixiv/commit/8f53ffc05c26060124e3c6d2507ab984671e4c62))
+
+
+### Bug Fixes
+
+* bypass sni check should check tls certs ([9bf1ac3](https://github.com/NateScarlet/pixiv/commit/9bf1ac38221b2774a488639576b274d5a8f7f3f4))
+* RoundTripper should not modify request ([b52fa79](https://github.com/NateScarlet/pixiv/commit/b52fa794e75502d06514cca611804a54cd878a1b))
+* tls cert verification should check expire time ([ad425c6](https://github.com/NateScarlet/pixiv/commit/ad425c628897908310983675fec513ec91f83085))
+
 ### [0.3.3](https://github.com/NateScarlet/pixiv/compare/v0.3.2...v0.3.3) (2020-09-15)
 
 
