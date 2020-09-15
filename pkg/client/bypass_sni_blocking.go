@@ -1,12 +1,13 @@
 package client
 
 import (
-	"bytes"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"net"
 	"net/http"
 	"sync"
+	"time"
 )
 
 // BypassSNIBlockingTransport bypass sni bloking when host in BlockedHostnames
@@ -40,23 +41,35 @@ func (t *BypassSNIBlockingTransport) ensureAntiSNIDetectTransport() http.RoundTr
 			}
 			return tls.Dial(network, net.JoinHostPort(ip, port), &tls.Config{
 				InsecureSkipVerify: true,
-				VerifyPeerCertificate: func(rawCerts [][]byte, _ [][]*x509.Certificate) (err error) {
-					certs, err := x509.ParseCertificates(bytes.Join(rawCerts, nil))
+				VerifyPeerCertificate: func(certificates [][]byte, _ [][]*x509.Certificate) (err error) {
+					certs := make([]*x509.Certificate, len(certificates))
+					for i, asn1Data := range certificates {
+						cert, err := x509.ParseCertificate(asn1Data)
+						if err != nil {
+							return err
+						}
+						certs[i] = cert
+					}
+					opts := x509.VerifyOptions{
+						DNSName:       host,
+						Intermediates: x509.NewCertPool(),
+					}
+					for _, cert := range certs[1:] {
+						opts.Intermediates.AddCert(cert)
+					}
+					cert := certs[0]
+					_, err = cert.Verify(opts)
 					if err != nil {
 						return
 					}
-					// need a valid cert for host
-					for _, i := range certs {
-						_, err = i.Verify(x509.VerifyOptions{})
-						if err != nil {
-							// ignore invalid cert
-							continue
-						}
-						err = i.VerifyHostname(host)
-						if err == nil {
-							break
-						}
+
+					if time.Now().After(cert.NotAfter) {
+						return errors.New("pixiv/client: certification is expired")
 					}
+					if err = cert.VerifyHostname(host); err != nil {
+						return
+					}
+
 					return
 				},
 			})
