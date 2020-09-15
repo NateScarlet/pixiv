@@ -15,7 +15,7 @@ PIXIV_DNS_QUERY_URL
 
   免代理所需要的 DNS over HTTPS 使用的服务网址。
   
-  服务器接口应类似于 `Google 公共 DNS 的 JSON API <https://developers.google.com/speed/public-dns/docs/doh/json>`_ ，大部分公共 DNS 服务应该都支持这个格式。。
+  服务器接口应类似于 `Google 公共 DNS 的 JSON API <https://developers.google.com/speed/public-dns/docs/doh/json>`_ ，大部分公共 DNS 服务应该都支持这个格式。
   
   使用时将设置 name 参数和 Accept:application/dns-json。
 
