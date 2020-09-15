@@ -1,9 +1,12 @@
-.PHONY: test deploy-docs
+.PHONY: test deploy-docs default
+
+default: docs
 
 docs/_build/html/.git:
 	rm -rf docs/_build/html
 	git worktree add docs/_build/html -B gh-pages
-	
+
+docs: export SPHINXOPTS=-a
 docs: docs/* docs/_build/html/.git
 	$(MAKE) -C docs html
 
