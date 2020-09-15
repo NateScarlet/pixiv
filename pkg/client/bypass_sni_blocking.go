@@ -19,6 +19,9 @@ var BlockedHostnames = map[string]struct{}{
 func (t BypassSNIBlockingTransport) RoundTrip(req *http.Request) (resp *http.Response, err error) {
 	if _, ok := BlockedHostnames[req.URL.Host]; !ok {
 		// skip not blocked.
+		if t.wrapped == nil {
+			return http.DefaultTransport.RoundTrip(req)
+		}
 		return t.wrapped.RoundTrip(req)
 	}
 
