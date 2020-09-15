@@ -16,13 +16,13 @@ description: string HTML描述
 
 createDate
 
-    类型: string, rf3339 日期
+    类型: string, rfc3339 日期
 
     创建时间
 
 uploadDate
 
-    类型: string, rf3339 日期
+    类型: string, rfc3339 日期
 
     上传时间，有可能晚于创建时间是一样的。
 
