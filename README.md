@@ -27,7 +27,7 @@ c := &client.Client{}
 c.Login("username", "password")
 
 // 启用免代理，环境变量 `PIXIV_BYPASS_SNI_BLOCKING` 不为空时自动为默认客户端启用免代理。
-// 当前实现依赖 Cloudflare 的 DNS over HTTPS 服务。
+// 当前实现需求一个 DNS over HTTPS 服务，默认使用 cloudflare，可通过 `PIXIV_DNS_QUERY_URL` 环境变量设置。
 c.BypassSNIBlocking()
 
 // 搜索画作

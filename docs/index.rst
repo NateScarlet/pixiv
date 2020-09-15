@@ -13,3 +13,4 @@ Pixiv go 客户端
   novel_search
   novel_rank
   user
+  env-vars
