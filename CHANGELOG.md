@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.3.2](https://github.com/NateScarlet/pixiv/compare/v0.3.1...v0.3.2) (2020-09-15)
+
+
+### Features
+
+* bypass sni blocking ([3793647](https://github.com/NateScarlet/pixiv/commit/3793647c0bd250b9ea5c3e1ab1e92880c48f7410)), closes [#8](https://github.com/NateScarlet/pixiv/issues/8) [#9](https://github.com/NateScarlet/pixiv/issues/9)
+
 ### [0.3.1](https://github.com/NateScarlet/pixiv/compare/v0.3.0...v0.3.1) (2020-04-06)
 
 
