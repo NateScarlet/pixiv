@@ -43,8 +43,6 @@ post_key
         "message": ""
     }
 
-登录时会读取 ``PIXIV_USERNAME`` 和 ``PIXIV_PASSWORD`` 环境变量，按需要进行登录。
-
 判断是否登录
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
