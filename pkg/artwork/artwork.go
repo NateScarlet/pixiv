@@ -29,6 +29,7 @@ type Artwork struct {
 	Tags        []string
 	Author      user.User
 
+	// TODO: should use uint64 type
 	Width  int64
 	Height int64
 
@@ -43,6 +44,8 @@ type Artwork struct {
 	isPagesFetched bool
 	isFetched      bool
 }
+
+// TODO: get client from context, so we can remove *WithClient methods.
 
 // FetchWithClient do fetch with given client.
 func (i *Artwork) FetchWithClient(c client.Client) (err error) {
