@@ -12,7 +12,7 @@ var Hosts = map[string]string{}
 
 // TODO: support custom dns server
 func resolveHostname(hostname string) (ip string, err error) {
-	if v, ok := Hosts[hostname]; ok {
+	if v, ok := Hosts[hostname]; ok && v != "" {
 		return v, nil
 	}
 
