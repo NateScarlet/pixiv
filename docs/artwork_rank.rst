@@ -65,7 +65,7 @@ p
 HTML 内容解析
 ---------------
 
-类名为 ``ranking-items``的元素中每个 section 为一个画作。
+类名为 ``ranking-items`` 的元素中每个 section 为一个画作。
 
 数据使用元素上的属性存储:
 
