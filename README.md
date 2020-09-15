@@ -26,6 +26,11 @@ client.Default
 c := &client.Client{}
 c.Login("username", "password")
 
+// 启用免代理，环境变量 `PIXIV_BYPASS_SNI_BLOCKING` 不为空时自动为默认客户端启用免代理。
+// 当前实现免代理依赖 Cloudflare 的 DNS over HTTPS 服务。
+// 当前实现会禁用 https 证书检查，请自行评估风险。
+c.BypassSNIBlocking()
+
 // 搜索画作
 result, err := artwork.Search("パチュリー・ノーレッジ", 1)
 result.JSON // json return data.

@@ -61,4 +61,7 @@ var Default = &Client{}
 
 func init() {
 	Default.SetPHPSESSID(os.Getenv("PIXIV_PHPSESSID"))
+	if os.Getenv("PIXIV_BYPASS_SNI_BLOCKING") != "" {
+		Default.BypassSNIBlocking()
+	}
 }
