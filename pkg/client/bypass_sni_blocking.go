@@ -2,6 +2,7 @@ package client
 
 import (
 	"crypto/tls"
+	"net"
 	"net/http"
 )
 
@@ -25,14 +26,21 @@ func (t BypassSNIBlockingTransport) RoundTrip(req *http.Request) (resp *http.Res
 		return t.wrapped.RoundTrip(req)
 	}
 
-	ip, err := resolveHostname(req.URL.Host)
-	req.Host = req.URL.Host
-	req.URL.Host = ip
-
 	// XXX: insecure transpot
 	var it = new(http.Transport)
-	it.TLSClientConfig = new(tls.Config)
-	it.TLSClientConfig.InsecureSkipVerify = true
+	it.DialTLS = func(network, addr string) (net.Conn, error) {
+		host, port, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
+		ip, err := resolveHostname(host)
+		if err != nil {
+			return nil, err
+		}
+		return tls.Dial(network, net.JoinHostPort(ip, port), &tls.Config{
+			InsecureSkipVerify: true,
+		})
+	}
 	return it.RoundTrip(req)
 
 }
