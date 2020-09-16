@@ -8,7 +8,7 @@ import (
 	"github.com/tidwall/gjson"
 )
 
-func dnsOverHTTPSResolve(dnsQueryURL string, hostname string) (ip string, err error) {
+func lookupDNSOverHTTPS(dnsQueryURL string, hostname string) (ip string, err error) {
 	req, err := http.NewRequest("GET", dnsQueryURL, nil)
 	if err != nil {
 		return
@@ -53,7 +53,7 @@ func resolveHostname(hostname string) (ip string, err error) {
 		return v, nil
 	}
 
-	return dnsOverHTTPSResolve(DNSQueryURL, hostname)
+	return lookupDNSOverHTTPS(DNSQueryURL, hostname)
 }
 
 func init() {
