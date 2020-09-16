@@ -95,7 +95,6 @@ func (t *BypassSNIBlockingTransport) RoundTrip(req *http.Request) (resp *http.Re
 }
 
 // BypassSNIBlocking wrap current transport with bypass sni blocking support.
-// SECURITY WARNING: TLS verification will be disabled for blocked site.
 func (c *Client) BypassSNIBlocking() {
 	c.Transport = &BypassSNIBlockingTransport{wrapped: c.Transport}
 }
