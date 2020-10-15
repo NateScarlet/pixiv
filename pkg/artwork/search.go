@@ -31,8 +31,8 @@ func (r SearchResult) Artworks() []Artwork {
 	ret := []Artwork{}
 	r.ForEach(func(key, value gjson.Result) bool {
 		a := Artwork{
-			ID:    value.Get("illustId").String(),
-			Title: value.Get("illustTitle").String(),
+			ID:    value.Get("id").String(),
+			Title: value.Get("title").String(),
 			Type:  value.Get("illustType").String(),
 			Author: user.User{
 				ID:   value.Get("userId").String(),

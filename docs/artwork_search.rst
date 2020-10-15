@@ -12,7 +12,7 @@ p
 
 数据格式:
 
-[body.illustManga]
+[body.illustManga.data]
 
 isAdContainer
 
@@ -24,13 +24,13 @@ isAdContainer
 
     2019-11-20: 改成 API 调用了，60 张图其中可能有 1 广告。
 
-illustId
+id
 
-    类型: string | null
+    类型: string 
 
     插画 Id。
 
-illustTitle
+title
 
     类型: string
 

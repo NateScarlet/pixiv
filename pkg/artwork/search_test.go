@@ -20,7 +20,7 @@ func TestSearchArtwork(t *testing.T) {
 	result.ForEach(func(key, value gjson.Result) bool {
 		count++
 		// t.Log(key, value)
-		assert.NotEmpty(t, value.Get("illustId"))
+		assert.NotEmpty(t, value.Get("id"))
 		return true
 	})
 	assert.GreaterOrEqual(t, count, 40)
@@ -29,6 +29,9 @@ func TestSearchArtwork(t *testing.T) {
 	assert.Len(t, artworks, count)
 	for _, i := range artworks {
 		assert.NotEmpty(t, i.ID)
+		assert.NotEmpty(t, i.Title)
+		assert.NotEmpty(t, i.Type)
+		assert.NotEmpty(t, i.Image.Thumb)
 		assert.NotEmpty(t, i.Tags)
 	}
 }
