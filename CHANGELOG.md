@@ -2,12 +2,11 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
-### [0.3.5](https://github.com/NateScarlet/pixiv/compare/v0.3.4...v0.3.5) (2020-10-15)
-
+## [0.3.5](https://github.com/NateScarlet/pixiv/compare/v0.3.4...v0.3.5) (2020-10-15)
 
 ### Bug Fixes
 
-* follow search api change ([bab1ecf](https://github.com/NateScarlet/pixiv/commit/bab1ecfadf459be0e7ed0f310e460e9e3fd3a6d0))
+- follow search api change ([bab1ecf](https://github.com/NateScarlet/pixiv/commit/bab1ecfadf459be0e7ed0f310e460e9e3fd3a6d0))
 
 ## [0.3.4](https://github.com/NateScarlet/pixiv/compare/v0.3.3...v0.3.4) (2020-09-15)
 
@@ -42,11 +41,6 @@ All notable changes to this project will be documented in this file. See [standa
 ## [0.3.0](https://github.com/NateScarlet/pixiv/compare/v0.2.0...v0.3.0) (2020-04-06)
 
 ### ⚠ BREAKING CHANGES
-
-- client url functions to `URL` methods
-- User.AvatarURLs -> User.Avatar
-- artwork.Page.URLs -> artwork.Page.Image
-- Artwork.URLs -> Artwork.Image
 
 - artwork.Page.URLs -> artwork.Page.Image ([dace691](https://github.com/NateScarlet/pixiv/commit/dace691cf717c56ef68309a9592c6c6a2ef7dec2))
 - Artwork.URLs -> Artwork.Image ([5a57f6f](https://github.com/NateScarlet/pixiv/commit/5a57f6fad70096f3532d34658b344043b9f21765))
