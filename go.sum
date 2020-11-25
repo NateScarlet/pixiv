@@ -1,3 +1,5 @@
+github.com/NateScarlet/snapshot v0.1.0 h1:RGWWKHlZF+W77yUKfjuZMOiYFIKGK6e7ZGuf3KPG9Cg=
+github.com/NateScarlet/snapshot v0.1.0/go.mod h1:skZqYCMXpYZc8/xd1b6wgcpYL4Q74QqEcbK6juk6c4g=
 github.com/PuerkitoBio/goquery v1.5.1 h1:PSPBGne8NIUWw+/7vFBV+kG2J/5MOjbzc7154OaKCSE=
 github.com/PuerkitoBio/goquery v1.5.1/go.mod h1:GsLWisAFVj4WgDibEWF4pvYnkVQBpKBKeU+7zCJoLcc=
 github.com/andybalholm/cascadia v1.1.0 h1:BuuO6sSfQNFRu1LppgbD25Hr2vLYW25JvxHs5zzsLTo=

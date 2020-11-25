@@ -3,6 +3,7 @@ module github.com/NateScarlet/pixiv
 go 1.13
 
 require (
+	github.com/NateScarlet/snapshot v0.1.0
 	github.com/PuerkitoBio/goquery v1.5.1
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/kr/pretty v0.1.0 // indirect

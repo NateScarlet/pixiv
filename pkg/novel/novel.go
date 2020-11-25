@@ -87,3 +87,8 @@ func (i *Novel) Fetch(ctx context.Context) (err error) {
 func (i Novel) URL(ctx context.Context) *url.URL {
 	return client.For(ctx).EndpointURL("/novel/show.php", &url.Values{"id": {i.ID}})
 }
+
+// HTMLContent from content
+func (i Novel) HTMLContent(ctx context.Context, renderer ContentRenderer) (string, error) {
+	return HTMLContent(ctx, renderer, i.Content)
+}
