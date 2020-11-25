@@ -64,7 +64,7 @@ func (t *BypassSNIBlockingTransport) ensureAntiSNIDetectTransport() http.RoundTr
 					}
 
 					if time.Now().After(cert.NotAfter) {
-						return errors.New("pixiv/client: certification is expired")
+						return errors.New("pixiv: client: certification is expired")
 					}
 					if err = cert.VerifyHostname(host); err != nil {
 						return

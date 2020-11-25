@@ -45,7 +45,7 @@ type Artwork struct {
 // Fetch additional data from pixiv single artwork api,
 func (i *Artwork) Fetch(ctx context.Context) (err error) {
 	if i.ID == "" {
-		return errors.New("no illust id specified")
+		return errors.New("pixiv: artwork: no id specified")
 	}
 	var c = client.For(ctx)
 	resp, err := c.GetWithContext(ctx, c.EndpointURL("/ajax/illust/"+i.ID, nil).String())
@@ -86,7 +86,7 @@ func (i *Artwork) Fetch(ctx context.Context) (err error) {
 // FetchPages get all pages for artwork from pixiv artwork pages api,
 func (i *Artwork) FetchPages(ctx context.Context) (err error) {
 	if i.ID == "" {
-		return errors.New("no illust id specified")
+		return errors.New("pixiv: artwork: no id specified")
 	}
 	var c = client.For(ctx)
 	resp, err := c.GetWithContext(ctx, c.EndpointURL("/ajax/illust/"+i.ID+"/pages", nil).String())

@@ -50,7 +50,7 @@ type Novel struct {
 // Fetch additional data from pixiv single novel api (require login),
 func (i *Novel) Fetch(ctx context.Context) (err error) {
 	if i.ID == "" {
-		return errors.New("no novel id specified")
+		return errors.New("pixiv: novel: no id specified")
 	}
 	var c = client.For(ctx)
 	resp, err := c.GetWithContext(ctx, c.EndpointURL("/ajax/novel/"+i.ID, nil).String())

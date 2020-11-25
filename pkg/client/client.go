@@ -53,7 +53,7 @@ func ParseAPIResult(r io.Reader) (ret gjson.Result, err error) {
 	}
 	s := string(data)
 	if !gjson.Valid(s) {
-		err = fmt.Errorf("invalid json: %s", s)
+		err = fmt.Errorf("pixiv: client: invalid json: %s", s)
 		return
 	}
 	ret = gjson.Parse(s)
@@ -61,7 +61,7 @@ func ParseAPIResult(r io.Reader) (ret gjson.Result, err error) {
 	message := ret.Get("message").String()
 	ret = ret.Get("body")
 	if hasError {
-		err = fmt.Errorf("pixiv api error: %s", message)
+		err = fmt.Errorf("pixiv: client: api error: %s", message)
 	}
 	return
 }

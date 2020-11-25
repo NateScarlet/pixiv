@@ -19,7 +19,7 @@ type User struct {
 // Fetch additional data from pixiv single user api,
 func (i *User) Fetch(ctx context.Context) (err error) {
 	if i.ID == "" {
-		return errors.New("no user id specified")
+		return errors.New("pixiv: user: no id specified")
 	}
 	var c = client.For(ctx)
 	resp, err := c.GetWithContext(ctx, c.EndpointURL("/ajax/user/"+i.ID, nil).String())

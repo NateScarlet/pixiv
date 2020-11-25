@@ -27,7 +27,7 @@ func (c Client) IsLoggedIn() (ret bool, err error) {
 	} else if resp.StatusCode == http.StatusOK {
 		return true, err
 	}
-	return false, errors.New("unexpected response for login test")
+	return false, errors.New("pixiv: client: unexpected response for login test")
 }
 
 func (c *Client) ensureJar() {
@@ -52,12 +52,12 @@ func (c *Client) Login(username string, password string) (err error) {
 	}
 	s := doc.Find(`input[name="post_key"]`)
 	if len(s.Nodes) == 0 {
-		err = errors.New("Can not found element for post key")
+		err = errors.New("pixiv: client: can not found element for post key")
 		return
 	}
 	postKey, ok := s.Attr("value")
 	if !ok {
-		err = errors.New("Can not extract post key")
+		err = errors.New("pixiv: client: can not extract post key")
 		return
 	}
 
@@ -78,7 +78,7 @@ func (c *Client) Login(username string, password string) (err error) {
 		return
 	}
 	if !body.Get("success").Exists() {
-		err = fmt.Errorf("login failed: %+v", body.String())
+		err = fmt.Errorf("pixiv: client: login failed: %+v", body.String())
 	}
 	return
 }

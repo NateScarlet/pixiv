@@ -110,7 +110,7 @@ func (rank *Rank) Fetch(ctx context.Context) (err error) {
 		},
 	)
 	if len(items) == 0 {
-		return fmt.Errorf("No rank items found: url=%s", resp.Request.URL.String())
+		return fmt.Errorf("pixiv: artwork: no rank items found: url=%s", resp.Request.URL.String())
 	}
 	rank.Items = items
 	return
