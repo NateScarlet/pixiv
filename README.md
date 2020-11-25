@@ -41,9 +41,10 @@ var ctx = context.Background()
 ctx = client.With(ctx, c)
 
 // 搜索画作
-result, err := artwork.Search(ctx, "パチュリー・ノーレッジ", 1)
+result, err := artwork.Search(ctx, "パチュリー・ノーレッジ")
 result.JSON // json return data.
 result.Artworks() // []artwork.Artwork，只有部分数据，通过 `Fetch` `FetchPages` 方法获取完整数据。
+artwork.Search(ctx, "パチュリー・ノーレッジ", artwork.SearchOptionPage(2)) // 获取第二页
 
 // 画作详情
 i := &artwork.Artwork{ID: "22238487"}
@@ -58,9 +59,10 @@ rank.Items[0].PreviousRank
 rank.Items[0].Artwork
 
 // 搜索小说
-result, err := novel.Search(ctx, "パチュリー・ノーレッジ", 1)
+result, err := novel.Search(ctx, "パチュリー・ノーレッジ")
 result.JSON // json return data.
 result.Novels() // []novel.Novel，只有部分数据，通过 `Fetch` 方法获取完整数据。
+novel.Search(ctx, "パチュリー・ノーレッジ", novel.SearchOptionPage(2)) // 获取第二页
 
 // 小说详情
 i := &novel.Novel{ID: "11983096"}

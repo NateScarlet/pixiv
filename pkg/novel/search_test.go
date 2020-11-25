@@ -10,7 +10,7 @@ import (
 
 func TestSearchNovel(t *testing.T) {
 	var ctx = context.Background()
-	result, err := Search(ctx, "パチュリー・ノーレッジ", 1)
+	result, err := Search(ctx, "パチュリー・ノーレッジ")
 	assert.NoError(t, err)
 	data := result.JSON
 	t.Log(data.Raw)

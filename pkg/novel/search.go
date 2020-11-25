@@ -54,11 +54,34 @@ func (r SearchResult) Novels() []Novel {
 
 }
 
+// SearchOptions for Search
+type SearchOptions struct {
+	Page int
+}
+
+// SearchOption mutate SearchOptions
+type SearchOption func(*SearchOptions)
+
+// SearchOptionPage change page to retrive
+func SearchOptionPage(page int) SearchOption {
+	return func(so *SearchOptions) {
+		so.Page = page
+	}
+}
+
 // Search calls pixiv novel search api.
-func Search(ctx context.Context, query string, page int) (result SearchResult, err error) {
+func Search(ctx context.Context, query string, opts ...SearchOption) (result SearchResult, err error) {
+	var args = new(SearchOptions)
+	for _, i := range opts {
+		i(args)
+	}
+	if args.Page < 1 {
+		args.Page = 1
+	}
+
 	q := url.Values{}
-	if page != 1 {
-		q.Set("p", strconv.Itoa(page))
+	if args.Page != 1 {
+		q.Set("p", strconv.Itoa(args.Page))
 	}
 
 	var c = client.For(ctx)
