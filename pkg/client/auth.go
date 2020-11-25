@@ -89,7 +89,7 @@ func (c *Client) SetPHPSESSID(v string) {
 
 	c.Jar.SetCookies(
 		c.EndpointURL("", nil),
-		[]*http.Cookie{&http.Cookie{
+		[]*http.Cookie{{
 			Domain: ".pixiv.net",
 			Path:   "/",
 			Name:   "PHPSESSID",
