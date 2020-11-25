@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.4.0](https://github.com/NateScarlet/pixiv/compare/v0.3.5...v0.4.0) (2020-11-25)
+
+
+### ⚠ BREAKING CHANGES
+
+* add `pixiv: ` prefix to all errors
+* add SearchOptions
+* not prevent repeat fetch
+* use client from context
+
+### Features
+
+* add `pixiv: ` prefix to all errors ([444af85](https://github.com/NateScarlet/pixiv/commit/444af85c41d1f8757871d393c2435cf1f856c71f))
+* add SearchOptions ([4b085d8](https://github.com/NateScarlet/pixiv/commit/4b085d85842901033a0a4e60a9cad4abc86ba6a8))
+* not prevent repeat fetch ([903ed9a](https://github.com/NateScarlet/pixiv/commit/903ed9a3fa96de25e8acf711e5deaec063dd52cd))
+* use client from context ([ac7122c](https://github.com/NateScarlet/pixiv/commit/ac7122cdeb6c51c82a1d1a15d81744a1cb2fd033))
+
 ## [0.3.5](https://github.com/NateScarlet/pixiv/compare/v0.3.4...v0.3.5) (2020-10-15)
 
 ### Bug Fixes
