@@ -30,7 +30,6 @@ type Artwork struct {
 	Tags        []string
 	Author      user.User
 
-	// TODO: should use uint64 type
 	Width  int64
 	Height int64
 
