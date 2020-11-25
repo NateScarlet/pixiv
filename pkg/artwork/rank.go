@@ -1,6 +1,7 @@
 package artwork
 
 import (
+	"context"
 	"fmt"
 	"io/ioutil"
 	"net/url"
@@ -48,8 +49,8 @@ type Rank struct {
 	Items   []RankItem
 }
 
-// URLWithClient to rank page.
-func (rank Rank) URLWithClient(c client.Client, q *url.Values) *url.URL {
+// URLWithQuery to rank page.
+func (rank Rank) URLWithQuery(ctx context.Context, q *url.Values) *url.URL {
 	if q == nil {
 		q = &url.Values{}
 	}
@@ -65,17 +66,17 @@ func (rank Rank) URLWithClient(c client.Client, q *url.Values) *url.URL {
 	if rank.Page > 1 {
 		q.Set("p", strconv.Itoa(rank.Page))
 	}
-	return c.EndpointURL("/ranking.php", q)
+	return client.For(ctx).EndpointURL("/ranking.php", q)
 }
 
 // URL to rank page.
-func (rank Rank) URL() *url.URL {
-	return rank.URLWithClient(*client.Default, nil)
+func (rank Rank) URL(ctx context.Context) *url.URL {
+	return rank.URLWithQuery(ctx, nil)
 }
 
-// FetchWithClient do request with given client
-func (rank *Rank) FetchWithClient(c client.Client) (err error) {
-	resp, err := c.Get(rank.URLWithClient(c, &url.Values{"format": {"json"}}).String())
+// Fetch rank
+func (rank *Rank) Fetch(ctx context.Context) (err error) {
+	resp, err := client.For(ctx).GetWithContext(ctx, rank.URLWithQuery(ctx, &url.Values{"format": {"json"}}).String())
 	if err != nil {
 		return
 	}
@@ -113,9 +114,4 @@ func (rank *Rank) FetchWithClient(c client.Client) (err error) {
 	}
 	rank.Items = items
 	return
-}
-
-// Fetch rank
-func (rank *Rank) Fetch() (err error) {
-	return rank.FetchWithClient(*client.Default)
 }

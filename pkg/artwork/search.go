@@ -1,6 +1,7 @@
 package artwork
 
 import (
+	"context"
 	"net/url"
 	"strconv"
 
@@ -60,9 +61,10 @@ func (r SearchResult) Artworks() []Artwork {
 
 }
 
-// SearchWithClient do search with given client.
-func SearchWithClient(c client.Client, query string, page int) (result SearchResult, err error) {
-	resp, err := c.Get(c.EndpointURL(
+// Search calls pixiv artwork search api.
+func Search(ctx context.Context, query string, page int) (result SearchResult, err error) {
+	var c = client.For(ctx)
+	resp, err := c.GetWithContext(ctx, c.EndpointURL(
 		"/ajax/search/artworks/"+query,
 		&url.Values{
 			"p": []string{strconv.Itoa(page)},
@@ -81,9 +83,4 @@ func SearchWithClient(c client.Client, query string, page int) (result SearchRes
 		JSON: body,
 	}
 	return
-}
-
-// Search calls pixiv artwork search api.
-func Search(query string, page int) (result SearchResult, err error) {
-	return SearchWithClient(*client.Default, query, page)
 }

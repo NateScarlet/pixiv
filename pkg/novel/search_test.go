@@ -1,6 +1,7 @@
 package novel
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -8,7 +9,8 @@ import (
 )
 
 func TestSearchNovel(t *testing.T) {
-	result, err := Search("パチュリー・ノーレッジ", 1)
+	var ctx = context.Background()
+	result, err := Search(ctx, "パチュリー・ノーレッジ", 1)
 	assert.NoError(t, err)
 	data := result.JSON
 	t.Log(data.Raw)

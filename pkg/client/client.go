@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -33,6 +34,15 @@ func (c Client) EndpointURL(path string, values *url.Values) *url.URL {
 		u.RawQuery = values.Encode()
 	}
 	return u
+}
+
+// GetWithContext create get request with context and do it.
+func (c *Client) GetWithContext(ctx context.Context, url string) (resp *http.Response, err error) {
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+	return c.Do(req)
 }
 
 // ParseAPIResult parses error from json api response, and returns body part.

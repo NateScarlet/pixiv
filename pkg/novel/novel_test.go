@@ -1,6 +1,7 @@
 package novel
 
 import (
+	"context"
 	"os"
 	"testing"
 	"time"
@@ -13,8 +14,9 @@ func TestFetchNovel(t *testing.T) {
 	if os.Getenv("PIXIV_PHPSESSID") == "" {
 		t.Skip("need login")
 	}
+	var ctx = context.Background()
 	i := Novel{ID: "11983096"}
-	err := i.Fetch()
+	err := i.Fetch(ctx)
 	require.NoError(t, err)
 	t.Log(i)
 	assert.Equal(t, "11983096", i.ID)
@@ -31,5 +33,5 @@ func TestFetchNovel(t *testing.T) {
 	assert.GreaterOrEqual(t, i.LikeCount, int64(3178))
 	assert.GreaterOrEqual(t, i.ViewCount, int64(21955))
 	assert.GreaterOrEqual(t, i.BookmarkCount, int64(3690))
-	assert.Equal(t, "https://www.pixiv.net/novel/show.php?id=11983096", i.URL().String())
+	assert.Equal(t, "https://www.pixiv.net/novel/show.php?id=11983096", i.URL(ctx).String())
 }

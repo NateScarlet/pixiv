@@ -1,6 +1,7 @@
 package novel
 
 import (
+	"context"
 	"errors"
 	"net/url"
 	"time"
@@ -48,15 +49,17 @@ type Novel struct {
 	isFetched bool
 }
 
-// FetchWithClient do request with given client.
-func (i *Novel) FetchWithClient(c client.Client) (err error) {
+// Fetch additional data from pixiv single novel api (require login),
+// only fetch once for same struct.
+func (i *Novel) Fetch(ctx context.Context) (err error) {
 	if i.isFetched {
 		return
 	}
 	if i.ID == "" {
 		return errors.New("no novel id specified")
 	}
-	resp, err := c.Get(c.EndpointURL("/ajax/novel/"+i.ID, nil).String())
+	var c = client.For(ctx)
+	resp, err := c.GetWithContext(ctx, c.EndpointURL("/ajax/novel/"+i.ID, nil).String())
 	if err != nil {
 		return
 	}
@@ -88,18 +91,7 @@ func (i *Novel) FetchWithClient(c client.Client) (err error) {
 	return
 }
 
-// Fetch additional data from pixiv single novel api (require login),
-// only fetch once for same struct.
-func (i *Novel) Fetch() (err error) {
-	return i.FetchWithClient(*client.Default)
-}
-
-// URLWithClient to view web page.
-func (i Novel) URLWithClient(c client.Client) *url.URL {
-	return c.EndpointURL("/novel/show.php", &url.Values{"id": {i.ID}})
-}
-
 // URL to view web page.
-func (i Novel) URL() *url.URL {
-	return i.URLWithClient(*client.Default)
+func (i Novel) URL(ctx context.Context) *url.URL {
+	return client.For(ctx).EndpointURL("/novel/show.php", &url.Values{"id": {i.ID}})
 }

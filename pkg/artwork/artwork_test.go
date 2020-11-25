@@ -1,6 +1,7 @@
 package artwork
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -10,7 +11,7 @@ import (
 
 func TestFetchArtwork(t *testing.T) {
 	i := Artwork{ID: "22238487"}
-	err := i.Fetch()
+	err := i.Fetch(context.Background())
 	t.Log(i)
 	require.NoError(t, err)
 	assert.Equal(t, "22238487", i.ID)
@@ -26,12 +27,12 @@ func TestFetchArtwork(t *testing.T) {
 	assert.LessOrEqual(t, int64(54), i.LikeCount)
 	assert.LessOrEqual(t, int64(899), i.ViewCount)
 	assert.LessOrEqual(t, int64(12), i.BookmarkCount)
-	assert.Equal(t, "https://www.pixiv.net/artworks/22238487", i.URL().String())
+	assert.Equal(t, "https://www.pixiv.net/artworks/22238487", i.URL(context.Background()).String())
 }
 
 func TestFetchPages(t *testing.T) {
 	i := Artwork{ID: "52200823"}
-	err := i.FetchPages()
+	err := i.FetchPages(context.Background())
 	require.NoError(t, err)
 	t.Log(i)
 	assert.Equal(t, "52200823", i.ID)

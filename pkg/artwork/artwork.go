@@ -1,6 +1,7 @@
 package artwork
 
 import (
+	"context"
 	"errors"
 	"net/url"
 	"time"
@@ -45,17 +46,18 @@ type Artwork struct {
 	isFetched      bool
 }
 
-// TODO: get client from context, so we can remove *WithClient methods.
-
-// FetchWithClient do fetch with given client.
-func (i *Artwork) FetchWithClient(c client.Client) (err error) {
+// Fetch additional data from pixiv single artwork api,
+// only fetch once for same struct.
+func (i *Artwork) Fetch(ctx context.Context) (err error) {
 	if i.isFetched {
 		return
 	}
+
 	if i.ID == "" {
 		return errors.New("no illust id specified")
 	}
-	resp, err := c.Get(c.EndpointURL("/ajax/illust/"+i.ID, nil).String())
+	var c = client.For(ctx)
+	resp, err := c.GetWithContext(ctx, c.EndpointURL("/ajax/illust/"+i.ID, nil).String())
 	if err != nil {
 		return
 	}
@@ -91,21 +93,17 @@ func (i *Artwork) FetchWithClient(c client.Client) (err error) {
 	return
 }
 
-// Fetch additional data from pixiv single artwork api,
+// FetchPages get all pages for artwork from pixiv artwork pages api,
 // only fetch once for same struct.
-func (i *Artwork) Fetch() (err error) {
-	return i.FetchWithClient(*client.Default)
-}
-
-// FetchPagesWithClient do request with given client.
-func (i *Artwork) FetchPagesWithClient(c client.Client) (err error) {
+func (i *Artwork) FetchPages(ctx context.Context) (err error) {
 	if i.isPagesFetched {
 		return
 	}
 	if i.ID == "" {
 		return errors.New("no illust id specified")
 	}
-	resp, err := c.Get(c.EndpointURL("/ajax/illust/"+i.ID+"/pages", nil).String())
+	var c = client.For(ctx)
+	resp, err := c.GetWithContext(ctx, c.EndpointURL("/ajax/illust/"+i.ID+"/pages", nil).String())
 	if err != nil {
 		return
 	}
@@ -132,18 +130,7 @@ func (i *Artwork) FetchPagesWithClient(c client.Client) (err error) {
 	return
 }
 
-// FetchPages get all pages for artwork from pixiv artwork pages api,
-// only fetch once for same struct.
-func (i *Artwork) FetchPages() (err error) {
-	return i.FetchPagesWithClient(*client.Default)
-}
-
-// URLWithClient to view artwork web page.
-func (i Artwork) URLWithClient(c client.Client) *url.URL {
-	return c.EndpointURL("/artworks/"+i.ID, nil)
-}
-
 // URL to view artwork web page.
-func (i Artwork) URL() *url.URL {
-	return i.URLWithClient(*client.Default)
+func (i Artwork) URL(ctx context.Context) *url.URL {
+	return client.For(ctx).EndpointURL("/artworks/"+i.ID, nil)
 }

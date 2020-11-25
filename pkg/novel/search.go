@@ -1,6 +1,7 @@
 package novel
 
 import (
+	"context"
 	"net/url"
 	"strconv"
 
@@ -53,14 +54,15 @@ func (r SearchResult) Novels() []Novel {
 
 }
 
-// SearchWithClient do request with given client.
-func SearchWithClient(c client.Client, query string, page int) (result SearchResult, err error) {
+// Search calls pixiv novel search api.
+func Search(ctx context.Context, query string, page int) (result SearchResult, err error) {
 	q := url.Values{}
 	if page != 1 {
 		q.Set("p", strconv.Itoa(page))
 	}
 
-	resp, err := c.Get(c.EndpointURL("/ajax/search/novels/"+query, &q).String())
+	var c = client.For(ctx)
+	resp, err := c.GetWithContext(ctx, c.EndpointURL("/ajax/search/novels/"+query, &q).String())
 	if err != nil {
 		return
 	}
@@ -71,9 +73,4 @@ func SearchWithClient(c client.Client, query string, page int) (result SearchRes
 	}
 	result = SearchResult{JSON: body}
 	return
-}
-
-// Search calls pixiv novel search api.
-func Search(query string, page int) (result SearchResult, err error) {
-	return SearchWithClient(*client.Default, query, page)
 }

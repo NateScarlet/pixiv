@@ -1,6 +1,7 @@
 package artwork
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -8,12 +9,13 @@ import (
 )
 
 func TestRankURL(t *testing.T) {
+	var ctx = context.Background()
 	date, err := time.Parse(time.RFC3339, "2020-01-01T00:00:00+00:00")
 	assert.NoError(t, err)
-	assert.Equal(t, "https://www.pixiv.net/ranking.php", Rank{Mode: "daily"}.URL().String())
-	assert.Equal(t, "https://www.pixiv.net/ranking.php?mode=weekly", Rank{Mode: "weekly"}.URL().String())
-	assert.Equal(t, "https://www.pixiv.net/ranking.php?date=20200101&mode=weekly", Rank{Mode: "weekly", Date: date}.URL().String())
-	assert.Equal(t, "https://www.pixiv.net/ranking.php?content=manga&date=20200101&mode=weekly", Rank{Mode: "weekly", Content: "manga", Date: date}.URL().String())
+	assert.Equal(t, "https://www.pixiv.net/ranking.php", Rank{Mode: "daily"}.URL(ctx).String())
+	assert.Equal(t, "https://www.pixiv.net/ranking.php?mode=weekly", Rank{Mode: "weekly"}.URL(ctx).String())
+	assert.Equal(t, "https://www.pixiv.net/ranking.php?date=20200101&mode=weekly", Rank{Mode: "weekly", Date: date}.URL(ctx).String())
+	assert.Equal(t, "https://www.pixiv.net/ranking.php?content=manga&date=20200101&mode=weekly", Rank{Mode: "weekly", Content: "manga", Date: date}.URL(ctx).String())
 }
 
 func TestArtworkRankSimple(t *testing.T) {
@@ -23,7 +25,7 @@ func TestArtworkRankSimple(t *testing.T) {
 		Mode: "daily",
 		Date: date,
 	}
-	err = rank.Fetch()
+	err = rank.Fetch(context.Background())
 	assert.NoError(t, err)
 	assert.GreaterOrEqual(t, len(rank.Items), 48)
 	for _, item := range rank.Items {
