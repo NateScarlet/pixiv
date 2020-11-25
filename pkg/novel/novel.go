@@ -45,16 +45,10 @@ type Novel struct {
 	LikeCount     int64
 	ViewCount     int64
 	BookmarkCount int64
-
-	isFetched bool
 }
 
 // Fetch additional data from pixiv single novel api (require login),
-// only fetch once for same struct.
 func (i *Novel) Fetch(ctx context.Context) (err error) {
-	if i.isFetched {
-		return
-	}
 	if i.ID == "" {
 		return errors.New("no novel id specified")
 	}
@@ -86,8 +80,6 @@ func (i *Novel) Fetch(ctx context.Context) (err error) {
 	}
 	i.Tags = tags
 	i.Content = data.Get("content").String()
-
-	i.isFetched = true
 	return
 }
 

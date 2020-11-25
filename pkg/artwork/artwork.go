@@ -40,18 +40,10 @@ type Artwork struct {
 	BookmarkCount int64
 
 	Pages []Page
-
-	isPagesFetched bool
-	isFetched      bool
 }
 
 // Fetch additional data from pixiv single artwork api,
-// only fetch once for same struct.
 func (i *Artwork) Fetch(ctx context.Context) (err error) {
-	if i.isFetched {
-		return
-	}
-
 	if i.ID == "" {
 		return errors.New("no illust id specified")
 	}
@@ -88,16 +80,11 @@ func (i *Artwork) Fetch(ctx context.Context) (err error) {
 		tags = append(tags, i.String())
 	}
 	i.Tags = tags
-	i.isFetched = true
 	return
 }
 
 // FetchPages get all pages for artwork from pixiv artwork pages api,
-// only fetch once for same struct.
 func (i *Artwork) FetchPages(ctx context.Context) (err error) {
-	if i.isPagesFetched {
-		return
-	}
 	if i.ID == "" {
 		return errors.New("no illust id specified")
 	}
@@ -125,7 +112,6 @@ func (i *Artwork) FetchPages(ctx context.Context) (err error) {
 		return true
 	})
 	i.Pages = pages
-	i.isPagesFetched = true
 	return
 }
 

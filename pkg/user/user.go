@@ -14,16 +14,10 @@ type User struct {
 	ID     string
 	Name   string
 	Avatar image.URLs
-
-	isFetched bool
 }
 
 // Fetch additional data from pixiv single user api,
-// only fetch once for same struct.
 func (i *User) Fetch(ctx context.Context) (err error) {
-	if i.isFetched {
-		return
-	}
 	if i.ID == "" {
 		return errors.New("no user id specified")
 	}
@@ -40,7 +34,6 @@ func (i *User) Fetch(ctx context.Context) (err error) {
 	i.Name = body.Get("name").String()
 	i.Avatar.Mini = body.Get("image").String()
 	i.Avatar.Thumb = body.Get("imageBig").String()
-	i.isFetched = true
 	return
 }
 
