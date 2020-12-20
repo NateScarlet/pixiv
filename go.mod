@@ -6,5 +6,5 @@ require (
 	github.com/NateScarlet/snapshot v0.3.0
 	github.com/PuerkitoBio/goquery v1.6.0
 	github.com/stretchr/testify v1.6.1
-	github.com/tidwall/gjson v1.6.3
+	github.com/tidwall/gjson v1.6.4
 )
