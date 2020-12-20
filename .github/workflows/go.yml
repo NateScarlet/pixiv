@@ -1,8 +1,11 @@
 name: Go
 on:
   push:
-    paths:
-      - "**.go"
+    paths-ignore:
+      - "docs/**"
+      - "*.md"
+  pull_request:
+  workflow_dispatch:
   schedule:
     - cron: "0 16 * * *"
 jobs:
