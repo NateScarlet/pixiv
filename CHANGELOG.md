@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.1](https://github.com/NateScarlet/pixiv/compare/v0.4.0...v0.4.1) (2021-01-03)
+
+
+### Features
+
+* add novel.HTMLContent ([38d0c2b](https://github.com/NateScarlet/pixiv/commit/38d0c2b17e74e9091fa3ca0ff704fa6e9e1d76bc))
+* full syntax support for novel.HTMLContent ([c24fbd5](https://github.com/NateScarlet/pixiv/commit/c24fbd572b3a8c4caa6c7648164d033f7f4d6fc5))
+
+
+### Bug Fixes
+
+* should set User-Agent header ([03a3b46](https://github.com/NateScarlet/pixiv/commit/03a3b46b3b0de7f5943631e792f71b0af766ab79)), closes [#17](https://github.com/NateScarlet/pixiv/issues/17)
+
 ## [0.4.0](https://github.com/NateScarlet/pixiv/compare/v0.3.5...v0.4.0) (2020-11-25)
 
 
