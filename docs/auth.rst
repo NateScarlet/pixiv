@@ -5,7 +5,11 @@ Pixiv 被墙所以需要配置代理。
 
 不登录时无法看到 R-18 内容，登录需要 Cookie 值 ``PHPSESSID``。
 
+同时P 站现在会屏蔽特定User-Agent，需要手动指定未被屏蔽的 User-Agent。
+
 图片带有 referer 标头检查，需要本地缓存。
+
+
 
 
 登录

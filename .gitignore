@@ -1,3 +1,6 @@
 /.env
 .vscode/*
 !.vscode/example
+
+# go files
+debug.test

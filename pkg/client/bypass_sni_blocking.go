@@ -95,6 +95,7 @@ func (t *BypassSNIBlockingTransport) RoundTrip(req *http.Request) (resp *http.Re
 }
 
 // BypassSNIBlocking wrap current transport with bypass sni blocking support.
+// must set before other settings, because it use a new http.Transport for blocked host
 func (c *Client) BypassSNIBlocking() {
 	c.Transport = &BypassSNIBlockingTransport{wrapped: c.Transport}
 }

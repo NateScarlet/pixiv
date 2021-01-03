@@ -7,6 +7,10 @@ PIXIV_PHPSESSID
 
   默认客户端的 PIXIV 会话 Cookie 值，用于绕过 reCAPTCHA 登录验证。
 
+PIXIV_USER_AGENT
+
+  对 Pixiv 请求使用的 User-Agent 标头，默认使用 ``Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0``。
+
 PIXIV_BYPASS_SNI_BLOCKING
 
   设为非空来启用默认客户端的免代理功能

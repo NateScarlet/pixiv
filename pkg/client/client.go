@@ -67,11 +67,18 @@ func ParseAPIResult(r io.Reader) (ret gjson.Result, err error) {
 }
 
 // Default client auto login with PIXIV_PHPSESSID env var.
-var Default = &Client{}
+var Default = new(Client)
+
+// DefaultUserAgent for new clients
+var DefaultUserAgent = os.Getenv("PIXIV_USER_AGENT")
 
 func init() {
-	Default.SetPHPSESSID(os.Getenv("PIXIV_PHPSESSID"))
+	if DefaultUserAgent == "" {
+		DefaultUserAgent = `Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0`
+	}
 	if os.Getenv("PIXIV_BYPASS_SNI_BLOCKING") != "" {
 		Default.BypassSNIBlocking()
 	}
+	Default.SetPHPSESSID(os.Getenv("PIXIV_PHPSESSID"))
+	Default.SetDefaultHeader("User-Agent", DefaultUserAgent)
 }

@@ -12,7 +12,10 @@ func TestLoginFromPHPSESSID(t *testing.T) {
 		t.Skip()
 		return
 	}
-	v, err := Default.IsLoggedIn()
+	var c = new(Client)
+	c.SetPHPSESSID(os.Getenv("PIXIV_PHPSESSID"))
+	c.SetDefaultHeader("User-Agent", DefaultUserAgent)
+	v, err := c.IsLoggedIn()
 	assert.NoError(t, err)
 	assert.True(t, v)
 }

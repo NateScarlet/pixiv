@@ -22,19 +22,25 @@ import (
 )
 
 // 默认客户端用环境变量 `PIXIV_PHPSESSID` 登录。
+// 并且 User-Agent 使用 `PIXIV_USER_AGENT` 或库内置的默认值。
 client.Default
 
 // 使用 PHPSESSID Cookie 登录 (推荐)。
 c := &client.Client{}
+c.SetDefaultHeader("User-Agent", client.DefaultUserAgent)
 c.SetPHPSESSID("PHPSESSID")
 
 // 通过账号密码登录(可能触发 reCAPTCHA)。
 c := &client.Client{}
+c.SetDefaultHeader("User-Agent", client.DefaultUserAgent)
 c.Login("username", "password")
 
 // 启用免代理，环境变量 `PIXIV_BYPASS_SNI_BLOCKING` 不为空时自动为默认客户端启用免代理。
 // 当前实现需求一个 DNS over HTTPS 服务，默认使用 cloudflare，可通过 `PIXIV_DNS_QUERY_URL` 环境变量设置。
+// 必须在其他客户端选项前调用 `BypassSNIBlocking`，因为对于封锁的域名它会使用一个更改过的 Transport 进行请求，无视在它之前进行的的设置。
+c := &client.Client{}
 c.BypassSNIBlocking()
+c.SetDefaultHeader("User-Agent", client.DefaultUserAgent)
 
 // 所有查询从 context 获取客户端设置, 如未设置将使用默认客户端。
 var ctx = context.Background()
