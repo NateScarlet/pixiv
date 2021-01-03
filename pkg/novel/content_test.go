@@ -14,7 +14,15 @@ func TestHTMLContent(t *testing.T) {
 		result, err := HTMLContent(
 			ctx,
 			SimpleContentRenderer{},
-			"Chapter 1\n[pixivimage:22238487]\np1\n[newpage]\nChapter 2\n[pixivimage:52200823-1]",
+			`[chapter:[[rb:本章标题 > 假名]]]
+[jump:2]
+[[jumpuri:标题 > http://example.com]]
+[newpage]
+[pixivimage:22238487]
+[newpage]
+[pixivimage:52200823-1]
+p1
+`,
 		)
 		require.NoError(t, err)
 		snapshot.Match(t, result, snapshot.OptionExt(".html"))
