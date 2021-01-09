@@ -7,6 +7,7 @@ import (
 
 	"github.com/NateScarlet/pixiv/pkg/client"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 )
 
@@ -50,9 +51,17 @@ func TestSearchR18Artwork(t *testing.T) {
 	c.SetDefaultHeader("User-Agent", client.DefaultUserAgent)
 
 	ctx := client.With(context.Background(), c)
-	R18result, _ := Search(ctx, "パチュリー・ノーレッジ", SearchOptionPage(2), SearchOptionMode("r18"), SearchOptionOrder("date"))
-	r18 := R18result.Artworks()
-	for _, i := range r18 {
+	result, err := Search(
+		ctx,
+		"パチュリー・ノーレッジ",
+		SearchOptionPage(2),
+		SearchOptionContentRating(ContentRatingR18),
+		SearchOptionOrder(OrderDateDSC),
+	)
+	require.NoError(t, err)
+	artworks := result.Artworks()
+	assert.NotEmpty(t, artworks)
+	for _, i := range artworks {
 		var found bool
 		for _, v := range i.Tags {
 			if v != "R-18" && v != "R-18G" {
