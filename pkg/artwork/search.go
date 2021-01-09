@@ -85,13 +85,26 @@ var (
 	ContentRatingR18 ContentRating = "r18"
 )
 
+// SearchMode to match artwork
+type SearchMode string
+
+// search modes
+var (
+	// exact tag match (default)
+	SearchModeTag SearchMode = ""
+	// partial tag match
+	SearchModePartialTag SearchMode = "s_tag"
+	// title or caption match
+	SearchModeTitleOrCaption SearchMode = "s_tc"
+)
+
 // SearchOptions for Search
 // see SearchOption* functions for documention.
 type SearchOptions struct {
 	Page              int
 	Order             Order
 	ContentRating     ContentRating
-	Mode              string
+	Mode              SearchMode
 	WidthLessThan     int
 	WidthGreaterThan  int
 	HeightLessThan    int
@@ -123,14 +136,7 @@ func SearchOptionContentRating(rating ContentRating) SearchOption {
 }
 
 // SearchOptionMode change search mode
-// modes:
-//   <empty string>
-//     exact tag match (default)
-//   s_tc
-//     title or caption match
-//   s_tag
-//     partial tag match
-func SearchOptionMode(mode string) SearchOption {
+func SearchOptionMode(mode SearchMode) SearchOption {
 	return func(so *SearchOptions) {
 		so.Mode = mode
 	}
@@ -174,7 +180,7 @@ func Search(ctx context.Context, query string, opts ...SearchOption) (result Sea
 		q.Set("order", string(args.Order))
 	}
 	if args.Mode != "" {
-		q.Set("s_mode", args.Mode)
+		q.Set("s_mode", string(args.Mode))
 	}
 	if args.WidthLessThan > 1 {
 		q.Set("wlt", strconv.Itoa(args.WidthLessThan))
