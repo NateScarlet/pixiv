@@ -61,11 +61,22 @@ func (r SearchResult) Artworks() []Artwork {
 
 }
 
+// Order for search result
+type Order string
+
+// orders
+var (
+	// date descending (default)
+	OrderDateDSC Order = ""
+	// date ascending
+	OrderDateASC Order = "date"
+)
+
 // SearchOptions for Search
 // see SearchOption* functions for documention.
 type SearchOptions struct {
 	Page              int
-	Order             string
+	Order             Order
 	ContentRating     string
 	Mode              string
 	WidthLessThan     int
@@ -85,12 +96,7 @@ func SearchOptionPage(page int) SearchOption {
 }
 
 // SearchOptionOrder change result order
-// orders:
-//  <empty string>
-//    date descending (default)
-//  date
-//    date ascending
-func SearchOptionOrder(order string) SearchOption {
+func SearchOptionOrder(order Order) SearchOption {
 	return func(so *SearchOptions) {
 		so.Order = order
 	}
@@ -159,7 +165,7 @@ func Search(ctx context.Context, query string, opts ...SearchOption) (result Sea
 		q.Set("mode", args.ContentRating)
 	}
 	if args.Order != "" {
-		q.Set("order", args.Order)
+		q.Set("order", string(args.Order))
 	}
 	if args.Mode != "" {
 		q.Set("s_mode", args.Mode)
