@@ -3,6 +3,7 @@ package artwork
 import (
 	"context"
 	"net/url"
+	"log"
 	"strconv"
 
 	"github.com/NateScarlet/pixiv/pkg/client"
@@ -64,6 +65,23 @@ func (r SearchResult) Artworks() []Artwork {
 // SearchOptions for Search
 type SearchOptions struct {
 	Page int
+	// - date: old first
+	// - date_d: new first
+	Order string
+	// - safe
+	// - r18
+	Mode string
+	// - s_tc: title & word
+	// - s_tag: partial consistent
+	SearchMode string
+
+	WidthLessThan     int
+	WidthtGreaterThan int
+	HeightLessThan    int
+	HeightGreaterThan int
+
+	// premium(会员)
+
 }
 
 // SearchOption mutate SearchOptions
@@ -76,12 +94,54 @@ func SearchOptionPage(page int) SearchOption {
 	}
 }
 
+// SearchOptionOrder change order sort
+// - date: old first
+// - date_d: new first
+func SearchOptionOrder(Order string) SearchOption {
+	return func(so *SearchOptions) {
+		so.Order = Order
+	}
+}
+
+// SearchOptionMode change mode
+// - safe
+// - r18
+func SearchOptionMode(Mode string) SearchOption {
+	return func(so *SearchOptions) {
+		so.Mode = Mode
+	}
+}
+
+// SearchOptionSearchMode change search mode
+// - s_tc: title & word
+// - s_tag: partial consistent
+func SearchOptionSearchMode(SearchMode string) SearchOption {
+	return func(so *SearchOptions) {
+		so.SearchMode = SearchMode
+	}
+}
+
+// SearchOptionSearchMode change picture resolution ratio
+// If not set or set zero, would not add to query parameters
+func SearchOptionResolutionRatio(WidthLessThan,
+	WidthtGreaterThan,
+	HeightLessThan,
+	HeightGreaterThan int) SearchOption {
+	return func(so *SearchOptions) {
+		so.WidthLessThan = WidthLessThan
+		so.WidthtGreaterThan = WidthtGreaterThan
+		so.HeightLessThan = HeightLessThan
+		so.HeightGreaterThan = HeightGreaterThan
+	}
+}
+
 // Search calls pixiv artwork search api.
 func Search(ctx context.Context, query string, opts ...SearchOption) (result SearchResult, err error) {
 	var args = new(SearchOptions)
 	for _, i := range opts {
 		i(args)
 	}
+
 	if args.Page < 1 {
 		args.Page = 1
 	}
@@ -90,8 +150,35 @@ func Search(ctx context.Context, query string, opts ...SearchOption) (result Sea
 	if args.Page != 1 {
 		q.Set("p", strconv.Itoa(args.Page))
 	}
+	if args.Mode != "" {
+		q.Set("mode", args.Mode)
+	}
+	if args.Order != "" {
+		q.Set("order", args.Order)
+	}
+	if args.SearchMode != "" {
+		q.Set("s_mode", args.SearchMode)
+	}
+	if args.WidthLessThan > 1 {
+		q.Set("wlt", strconv.Itoa(args.WidthLessThan))
+	}
+	if args.WidthtGreaterThan > 1 {
+		q.Set("wgt", strconv.Itoa(args.WidthtGreaterThan))
+	}
+	if args.HeightLessThan > 1 {
+		q.Set("wgt", strconv.Itoa(args.HeightLessThan))
+	}
+	if args.HeightGreaterThan > 1 {
+		q.Set("wgt", strconv.Itoa(args.HeightGreaterThan))
+	}
+
+	
 
 	var c = client.For(ctx)
+	log.Println(c.EndpointURL(
+		"/ajax/search/artworks/"+query,
+		&q,
+	))
 	resp, err := c.GetWithContext(ctx, c.EndpointURL(
 		"/ajax/search/artworks/"+query,
 		&q,

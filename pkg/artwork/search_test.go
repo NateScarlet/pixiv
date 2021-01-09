@@ -36,4 +36,17 @@ func TestSearchArtwork(t *testing.T) {
 		assert.NotEmpty(t, i.Image.Thumb)
 		assert.NotEmpty(t, i.Tags)
 	}
+
+	R18result, _ := Search(ctx, "パチュリー・ノーレッジ", SearchOptionPage(2), SearchOptionMode("r18"), SearchOptionOrder("date"))
+	r18 := R18result.Artworks()
+	for _, i := range r18 {
+		var found bool
+		for _, v := range i.Tags {
+			if v != "R-18" && v != "R-18G" {
+				continue
+			}
+			found = true
+		}
+		assert.True(t, found)
+	}
 }
