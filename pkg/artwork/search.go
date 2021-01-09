@@ -3,7 +3,6 @@ package artwork
 import (
 	"context"
 	"net/url"
-	"log"
 	"strconv"
 
 	"github.com/NateScarlet/pixiv/pkg/client"
@@ -172,13 +171,7 @@ func Search(ctx context.Context, query string, opts ...SearchOption) (result Sea
 		q.Set("wgt", strconv.Itoa(args.HeightGreaterThan))
 	}
 
-	
-
 	var c = client.For(ctx)
-	log.Println(c.EndpointURL(
-		"/ajax/search/artworks/"+query,
-		&q,
-	))
 	resp, err := c.GetWithContext(ctx, c.EndpointURL(
 		"/ajax/search/artworks/"+query,
 		&q,
