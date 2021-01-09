@@ -62,25 +62,16 @@ func (r SearchResult) Artworks() []Artwork {
 }
 
 // SearchOptions for Search
+// see SearchOption* functions for documention.
 type SearchOptions struct {
-	Page int
-	// - date: old first
-	// - date_d: new first
-	Order string
-	// - safe
-	// - r18
-	ContentRating string
-	// - s_tc: title & word
-	// - s_tag: partial consistent
-	Mode string
-
+	Page              int
+	Order             string
+	ContentRating     string
+	Mode              string
 	WidthLessThan     int
 	WidthGreaterThan  int
 	HeightLessThan    int
 	HeightGreaterThan int
-
-	// premium(会员)
-
 }
 
 // SearchOption mutate SearchOptions
@@ -93,18 +84,26 @@ func SearchOptionPage(page int) SearchOption {
 	}
 }
 
-// SearchOptionOrder change order sort
-// - date: old first
-// - date_d: new first
+// SearchOptionOrder change result order
+// orders:
+//  <empty string>
+//    date descending (default)
+//  date
+//    date ascending
 func SearchOptionOrder(Order string) SearchOption {
 	return func(so *SearchOptions) {
 		so.Order = Order
 	}
 }
 
-// SearchOptionContentRating change mode
-// - safe
-// - r18
+// SearchOptionContentRating filter result by content rating
+// ratings:
+//   <empty string>
+//     all content (default)
+//   safe
+//     general content
+//   r18
+//     restricted 18+ content
 func SearchOptionContentRating(rating string) SearchOption {
 	return func(so *SearchOptions) {
 		so.ContentRating = rating
@@ -112,16 +111,21 @@ func SearchOptionContentRating(rating string) SearchOption {
 }
 
 // SearchOptionMode change search mode
-// - s_tc: title & word
-// - s_tag: partial consistent
+// modes:
+//   <empty string>
+//     exact tag match (default)
+//   s_tc
+//     title or caption match
+//   s_tag
+//     partial tag match
 func SearchOptionMode(mode string) SearchOption {
 	return func(so *SearchOptions) {
 		so.Mode = mode
 	}
 }
 
-// SearchOptionResolution change picture resolution ratio
-// If not set or set zero, would not add to query parameters
+// SearchOptionResolution filter result by original image resolution,
+// use 0 to unset limit.
 func SearchOptionResolution(
 	WidthLessThan,
 	WidthGreaterThan,
