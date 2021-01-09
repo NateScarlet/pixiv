@@ -14,7 +14,7 @@ import (
 func TestSearchArtwork(t *testing.T) {
 	var ctx = context.Background()
 	result, err := Search(ctx, "パチュリー・ノーレッジ")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	data := result.JSON
 	// t.Log(data.Raw)
 	assert.Equal(t, false, data.Get("error").Bool())

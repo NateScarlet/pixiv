@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
 )
 
 func TestSearchNovel(t *testing.T) {
 	var ctx = context.Background()
 	result, err := Search(ctx, "パチュリー・ノーレッジ")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	data := result.JSON
 	t.Log(data.Raw)
 	assert.Equal(t, false, data.Get("error").Bool())

@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestLoginFromPHPSESSID(t *testing.T) {
@@ -16,7 +17,7 @@ func TestLoginFromPHPSESSID(t *testing.T) {
 	c.SetPHPSESSID(os.Getenv("PIXIV_PHPSESSID"))
 	c.SetDefaultHeader("User-Agent", DefaultUserAgent)
 	v, err := c.IsLoggedIn()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, v)
 }
 
@@ -30,14 +31,14 @@ func TestLogin(t *testing.T) {
 	}
 	c := Client{}
 	err := c.Login(username, password)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	v, err := c.IsLoggedIn()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.True(t, v)
 }
 
 func TestIsLoggedIn(t *testing.T) {
 	v, err := Client{}.IsLoggedIn()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.False(t, v)
 }

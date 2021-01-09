@@ -23,7 +23,7 @@ func TestFetchNovel(t *testing.T) {
 	assert.Equal(t, "転生したら獪岳になってんだが俺はこいつのことをよく知らない・玖", i.Title)
 	assert.GreaterOrEqual(t, len(i.Tags), 6)
 	created, err := time.Parse(time.RFC3339, "2019-11-21T16:49:02+00:00")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, created, i.Created)
 	assert.Equal(t, "41540476", i.Author.ID)
 	assert.NotEmpty(t, i.Author.Name)
