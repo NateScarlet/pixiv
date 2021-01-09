@@ -2,8 +2,10 @@ package artwork
 
 import (
 	"context"
+	"os"
 	"testing"
 
+	"github.com/NateScarlet/pixiv/pkg/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/tidwall/gjson"
 )
@@ -35,5 +37,29 @@ func TestSearchArtwork(t *testing.T) {
 		assert.NotEmpty(t, i.Type)
 		assert.NotEmpty(t, i.Image.Thumb)
 		assert.NotEmpty(t, i.Tags)
+	}
+}
+
+func TestSearchR18Artwork(t *testing.T) {
+	if os.Getenv("PIXIV_PHPSESSID") == "" {
+		t.Skip()
+		return
+	}
+	var c = new(client.Client)
+	c.SetPHPSESSID(os.Getenv("PIXIV_PHPSESSID"))
+	c.SetDefaultHeader("User-Agent", client.DefaultUserAgent)
+
+	ctx := client.With(context.Background(), c)
+	R18result, _ := Search(ctx, "パチュリー・ノーレッジ", SearchOptionPage(2), SearchOptionMode("r18"), SearchOptionOrder("date"))
+	r18 := R18result.Artworks()
+	for _, i := range r18 {
+		var found bool
+		for _, v := range i.Tags {
+			if v != "R-18" && v != "R-18G" {
+				continue
+			}
+			found = true
+		}
+		assert.True(t, found)
 	}
 }
