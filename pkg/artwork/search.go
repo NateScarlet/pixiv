@@ -72,12 +72,25 @@ var (
 	OrderDateASC Order = "date"
 )
 
+// ContentRating of a artwork
+type ContentRating string
+
+// content ratings
+var (
+	// all content (default)
+	ContentRatingAll ContentRating = ""
+	// content that suitable for all ages
+	ContentRatingSafe ContentRating = "safe"
+	// restricted r18+ content
+	ContentRatingR18 ContentRating = "r18"
+)
+
 // SearchOptions for Search
 // see SearchOption* functions for documention.
 type SearchOptions struct {
 	Page              int
 	Order             Order
-	ContentRating     string
+	ContentRating     ContentRating
 	Mode              string
 	WidthLessThan     int
 	WidthGreaterThan  int
@@ -103,14 +116,7 @@ func SearchOptionOrder(order Order) SearchOption {
 }
 
 // SearchOptionContentRating filter result by content rating
-// ratings:
-//   <empty string>
-//     all content (default)
-//   safe
-//     general content
-//   r18
-//     restricted 18+ content
-func SearchOptionContentRating(rating string) SearchOption {
+func SearchOptionContentRating(rating ContentRating) SearchOption {
 	return func(so *SearchOptions) {
 		so.ContentRating = rating
 	}
@@ -162,7 +168,7 @@ func Search(ctx context.Context, query string, opts ...SearchOption) (result Sea
 		q.Set("p", strconv.Itoa(args.Page))
 	}
 	if args.ContentRating != "" {
-		q.Set("mode", args.ContentRating)
+		q.Set("mode", string(args.ContentRating))
 	}
 	if args.Order != "" {
 		q.Set("order", string(args.Order))
