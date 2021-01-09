@@ -2,7 +2,6 @@ package artwork
 
 import (
 	"context"
-	"log"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -42,7 +41,6 @@ func TestSearchArtwork(t *testing.T) {
 	r18 := R18result.Artworks()
 	for _, i := range r18 {
 		var found bool
-		log.Println(i.Tags)
 		for _, v := range i.Tags {
 			if v != "R-18" && v != "R-18G" {
 				continue
