@@ -120,15 +120,15 @@ func SearchOptionSearchMode(SearchMode string) SearchOption {
 	}
 }
 
-// SearchOptionSearchMode change picture resolution ratio
+// SearchOptionResolutionRatio change picture resolution ratio
 // If not set or set zero, would not add to query parameters
 func SearchOptionResolutionRatio(WidthLessThan,
-	WidthtGreaterThan,
+	WidthGreaterThan,
 	HeightLessThan,
 	HeightGreaterThan int) SearchOption {
 	return func(so *SearchOptions) {
 		so.WidthLessThan = WidthLessThan
-		so.WidthGreaterThan = WidthtGreaterThan
+		so.WidthGreaterThan = WidthGreaterThan
 		so.HeightLessThan = HeightLessThan
 		so.HeightGreaterThan = HeightGreaterThan
 	}
