@@ -72,7 +72,7 @@ type SearchOptions struct {
 	ContentRating string
 	// - s_tc: title & word
 	// - s_tag: partial consistent
-	SearchMode string
+	Mode string
 
 	WidthLessThan     int
 	WidthGreaterThan  int
@@ -111,12 +111,12 @@ func SearchOptionContentRating(rating string) SearchOption {
 	}
 }
 
-// SearchOptionSearchMode change search mode
+// SearchOptionMode change search mode
 // - s_tc: title & word
 // - s_tag: partial consistent
-func SearchOptionSearchMode(SearchMode string) SearchOption {
+func SearchOptionMode(mode string) SearchOption {
 	return func(so *SearchOptions) {
-		so.SearchMode = SearchMode
+		so.Mode = mode
 	}
 }
 
@@ -157,8 +157,8 @@ func Search(ctx context.Context, query string, opts ...SearchOption) (result Sea
 	if args.Order != "" {
 		q.Set("order", args.Order)
 	}
-	if args.SearchMode != "" {
-		q.Set("s_mode", args.SearchMode)
+	if args.Mode != "" {
+		q.Set("s_mode", args.Mode)
 	}
 	if args.WidthLessThan > 1 {
 		q.Set("wlt", strconv.Itoa(args.WidthLessThan))
