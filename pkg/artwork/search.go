@@ -69,7 +69,7 @@ type SearchOptions struct {
 	Order string
 	// - safe
 	// - r18
-	Mode string
+	ContentRating string
 	// - s_tc: title & word
 	// - s_tag: partial consistent
 	SearchMode string
@@ -102,12 +102,12 @@ func SearchOptionOrder(Order string) SearchOption {
 	}
 }
 
-// SearchOptionMode change mode
+// SearchOptionContentRating change mode
 // - safe
 // - r18
-func SearchOptionMode(Mode string) SearchOption {
+func SearchOptionContentRating(rating string) SearchOption {
 	return func(so *SearchOptions) {
-		so.Mode = Mode
+		so.ContentRating = rating
 	}
 }
 
@@ -151,8 +151,8 @@ func Search(ctx context.Context, query string, opts ...SearchOption) (result Sea
 	if args.Page != 1 {
 		q.Set("p", strconv.Itoa(args.Page))
 	}
-	if args.Mode != "" {
-		q.Set("mode", args.Mode)
+	if args.ContentRating != "" {
+		q.Set("mode", args.ContentRating)
 	}
 	if args.Order != "" {
 		q.Set("order", args.Order)
