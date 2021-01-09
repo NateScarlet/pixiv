@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.5.0](https://github.com/NateScarlet/pixiv/compare/v0.4.2...v0.5.0) (2021-01-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* **artwork:** use int64 for resolution search option
+* **artwork:** add SearchMode type
+* **artwork:** add ContentRating type
+* **artwork:** add Order type
+* **artwork:** rename SearchOptionSearchMode -> SearchOptionMode
+* **artwork:** rename SearchOptionMode -> SearchOptionContentRating
+* **artwork:** rename SearchOptionResolutionRatio -> SearchOptionResolution
+
+### Features
+
+* **artwork:** add ContentRating type ([7c74e2d](https://github.com/NateScarlet/pixiv/commit/7c74e2de075dc56d2869e8019742638e72070588))
+* **artwork:** add Order type ([2df58b8](https://github.com/NateScarlet/pixiv/commit/2df58b8940bf6f8cc2da48087e4331c46ac2833b))
+* **artwork:** add SearchMode type ([18ab9a0](https://github.com/NateScarlet/pixiv/commit/18ab9a04c756735c971e32bad0a93a5f4aab7b8a))
+* **artwork:** rename SearchOptionMode -> SearchOptionContentRating ([f7ff4b4](https://github.com/NateScarlet/pixiv/commit/f7ff4b49e0901085e87ec321cbe602cba19d68df))
+* **artwork:** rename SearchOptionResolutionRatio -> SearchOptionResolution ([c1214d6](https://github.com/NateScarlet/pixiv/commit/c1214d6a827d1c8b169da9864f411252002af041))
+* **artwork:** rename SearchOptionSearchMode -> SearchOptionMode ([bd8a57c](https://github.com/NateScarlet/pixiv/commit/bd8a57c5d6bc620edc49c15c5c3bdc8cfdc9fadf))
+* **artwork:** use int64 for resolution search option ([5305efa](https://github.com/NateScarlet/pixiv/commit/5305efaa5f27082fe4f21bb561872be364b85477))
+
+
+### Bug Fixes
+
+* **artwork:** search by resolution not work ([0a5b7fe](https://github.com/NateScarlet/pixiv/commit/0a5b7fe89ab3695e0e85496e2cf353b10d51102f))
+* **artwork:** search option WidthtGreaterThan -> WidthGreaterThan ([7a145b8](https://github.com/NateScarlet/pixiv/commit/7a145b8a51b52e0be741ffe3d8a7d9fc2e597f74))
+
 ### [0.4.2](https://github.com/NateScarlet/pixiv/compare/v0.4.1...v0.4.2) (2021-01-09)
 
 
