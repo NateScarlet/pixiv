@@ -105,10 +105,10 @@ type SearchOptions struct {
 	Order             Order
 	ContentRating     ContentRating
 	Mode              SearchMode
-	WidthLessThan     int
-	WidthGreaterThan  int
-	HeightLessThan    int
-	HeightGreaterThan int
+	WidthLessThan     int64
+	WidthGreaterThan  int64
+	HeightLessThan    int64
+	HeightGreaterThan int64
 }
 
 // SearchOption mutate SearchOptions
@@ -148,7 +148,7 @@ func SearchOptionResolution(
 	widthLessThan,
 	widthGreaterThan,
 	heightLessThan,
-	heightGreaterThan int,
+	heightGreaterThan int64,
 ) SearchOption {
 	return func(so *SearchOptions) {
 		so.WidthLessThan = widthLessThan
@@ -183,16 +183,16 @@ func Search(ctx context.Context, query string, opts ...SearchOption) (result Sea
 		q.Set("s_mode", string(args.Mode))
 	}
 	if args.WidthLessThan > 1 {
-		q.Set("wlt", strconv.Itoa(args.WidthLessThan))
+		q.Set("wlt", strconv.FormatInt(args.WidthLessThan, 10))
 	}
 	if args.WidthGreaterThan > 1 {
-		q.Set("wgt", strconv.Itoa(args.WidthGreaterThan))
+		q.Set("wgt", strconv.FormatInt(args.WidthGreaterThan, 10))
 	}
 	if args.HeightLessThan > 1 {
-		q.Set("hlt", strconv.Itoa(args.HeightLessThan))
+		q.Set("hlt", strconv.FormatInt(args.HeightLessThan, 10))
 	}
 	if args.HeightGreaterThan > 1 {
-		q.Set("hgt", strconv.Itoa(args.HeightGreaterThan))
+		q.Set("hgt", strconv.FormatInt(args.HeightGreaterThan, 10))
 	}
 
 	var c = client.For(ctx)
