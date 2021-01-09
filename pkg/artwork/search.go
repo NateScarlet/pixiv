@@ -90,9 +90,9 @@ func SearchOptionPage(page int) SearchOption {
 //    date descending (default)
 //  date
 //    date ascending
-func SearchOptionOrder(Order string) SearchOption {
+func SearchOptionOrder(order string) SearchOption {
 	return func(so *SearchOptions) {
-		so.Order = Order
+		so.Order = order
 	}
 }
 
@@ -127,16 +127,16 @@ func SearchOptionMode(mode string) SearchOption {
 // SearchOptionResolution filter result by original image resolution,
 // use 0 to unset limit.
 func SearchOptionResolution(
-	WidthLessThan,
-	WidthGreaterThan,
-	HeightLessThan,
-	HeightGreaterThan int,
+	widthLessThan,
+	widthGreaterThan,
+	heightLessThan,
+	heightGreaterThan int,
 ) SearchOption {
 	return func(so *SearchOptions) {
-		so.WidthLessThan = WidthLessThan
-		so.WidthGreaterThan = WidthGreaterThan
-		so.HeightLessThan = HeightLessThan
-		so.HeightGreaterThan = HeightGreaterThan
+		so.WidthLessThan = widthLessThan
+		so.WidthGreaterThan = widthGreaterThan
+		so.HeightLessThan = heightLessThan
+		so.HeightGreaterThan = heightGreaterThan
 	}
 }
 
