@@ -165,10 +165,10 @@ func Search(ctx context.Context, query string, opts ...SearchOption) (result Sea
 		q.Set("wgt", strconv.Itoa(args.WidthGreaterThan))
 	}
 	if args.HeightLessThan > 1 {
-		q.Set("wgt", strconv.Itoa(args.HeightLessThan))
+		q.Set("hlt", strconv.Itoa(args.HeightLessThan))
 	}
 	if args.HeightGreaterThan > 1 {
-		q.Set("wgt", strconv.Itoa(args.HeightGreaterThan))
+		q.Set("hgt", strconv.Itoa(args.HeightGreaterThan))
 	}
 
 	var c = client.For(ctx)
