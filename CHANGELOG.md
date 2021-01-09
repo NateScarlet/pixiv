@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.4.2](https://github.com/NateScarlet/pixiv/compare/v0.4.1...v0.4.2) (2021-01-09)
+
+
+### Features
+
+* **artwork:** update the r18 mode in artwork search function ([#18](https://github.com/NateScarlet/pixiv/issues/18)) ([4079b08](https://github.com/NateScarlet/pixiv/commit/4079b08d50f2ff8951f01d22f3d59318b541dfa3))
+
 ### [0.4.1](https://github.com/NateScarlet/pixiv/compare/v0.4.0...v0.4.1) (2021-01-03)
 
 
