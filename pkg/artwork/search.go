@@ -75,7 +75,7 @@ type SearchOptions struct {
 	SearchMode string
 
 	WidthLessThan     int
-	WidthtGreaterThan int
+	WidthGreaterThan  int
 	HeightLessThan    int
 	HeightGreaterThan int
 
@@ -128,7 +128,7 @@ func SearchOptionResolutionRatio(WidthLessThan,
 	HeightGreaterThan int) SearchOption {
 	return func(so *SearchOptions) {
 		so.WidthLessThan = WidthLessThan
-		so.WidthtGreaterThan = WidthtGreaterThan
+		so.WidthGreaterThan = WidthtGreaterThan
 		so.HeightLessThan = HeightLessThan
 		so.HeightGreaterThan = HeightGreaterThan
 	}
@@ -161,8 +161,8 @@ func Search(ctx context.Context, query string, opts ...SearchOption) (result Sea
 	if args.WidthLessThan > 1 {
 		q.Set("wlt", strconv.Itoa(args.WidthLessThan))
 	}
-	if args.WidthtGreaterThan > 1 {
-		q.Set("wgt", strconv.Itoa(args.WidthtGreaterThan))
+	if args.WidthGreaterThan > 1 {
+		q.Set("wgt", strconv.Itoa(args.WidthGreaterThan))
 	}
 	if args.HeightLessThan > 1 {
 		q.Set("wgt", strconv.Itoa(args.HeightLessThan))
