@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.5.1](https://github.com/NateScarlet/pixiv/compare/v0.5.0...v0.5.1) (2021-01-10)
+
+
+### Features
+
+* **novel:** trim space for SimpleContentRenderer image link ([5cdd312](https://github.com/NateScarlet/pixiv/commit/5cdd312b8a02bcca10802ed873ef39f203f291c9))
+
 ## [0.5.0](https://github.com/NateScarlet/pixiv/compare/v0.4.2...v0.5.0) (2021-01-09)
 
 
