@@ -50,7 +50,7 @@ func (r SimpleContentRenderer) Paragraph(ctx context.Context, text string) (ret 
 
 // NewPage implements ContentRenderer
 func (r SimpleContentRenderer) NewPage(ctx context.Context, index int) (ret string, err error) {
-	return fmt.Sprintf(`<hr id="page-%d">`, index), nil
+	return fmt.Sprintf(`<hr id="page-%d">`, index+1), nil
 }
 
 // Ruby implements ContentRenderer
@@ -69,8 +69,8 @@ func (r SimpleContentRenderer) JumpURI(ctx context.Context, title, uri string) (
 }
 
 // JumpPage implements ContentRenderer
-func (r SimpleContentRenderer) JumpPage(ctx context.Context, index int) (ret string, err error) {
-	return fmt.Sprintf(`<a href="#page-%d">page %d</a>`, index, index), nil
+func (r SimpleContentRenderer) JumpPage(ctx context.Context, page int) (ret string, err error) {
+	return fmt.Sprintf(`<a href="#page-%d">page %d</a>`, page, page), nil
 }
 
 // EmbeddedImage implements ContentRenderer
