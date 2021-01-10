@@ -33,4 +33,12 @@ p3
 		snapshot.Match(t, result, snapshot.OptionExt(".html"))
 	})
 
+	t.Run("real", func(t *testing.T) {
+		i := Novel{ID: "14443124"}
+		err := i.Fetch(ctx)
+		require.NoError(t, err)
+		result, err := i.HTMLContent(ctx, nil)
+		require.NoError(t, err)
+		snapshot.Match(t, result, snapshot.OptionExt(".html"))
+	})
 }

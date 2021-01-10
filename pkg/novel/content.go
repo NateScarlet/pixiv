@@ -6,6 +6,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/NateScarlet/pixiv/pkg/image"
 )
 
 var newPagePattern = regexp.MustCompile(`\[newpage]`)
@@ -14,6 +16,7 @@ var rubyPattern = regexp.MustCompile(`\[\[rb:(.+?)? ?> ?(.+?)]]`)
 var chapterPattern = regexp.MustCompile(`\[chapter:(.+?)?]`)
 var jumpURIPattern = regexp.MustCompile(`\[\[jumpuri:(.+?)? ?> ?(.+?)]]`)
 var jumpPagePattern = regexp.MustCompile(`\[jump:(\d+?)?]`)
+var embeddedImagePattern = regexp.MustCompile(`\[uploadedimage:(.+?)?]`)
 
 // ContentRenderer can render novel content
 type ContentRenderer interface {
@@ -24,10 +27,13 @@ type ContentRenderer interface {
 	Chapter(ctx context.Context, name string) (string, error)
 	JumpURI(ctx context.Context, title, uri string) (string, error)
 	JumpPage(ctx context.Context, page int) (string, error)
+	EmbeddedImage(ctx context.Context, id string) (string, error)
 }
 
 // SimpleContentRenderer is a simple implementation of ContentRenderer
-type SimpleContentRenderer struct{}
+type SimpleContentRenderer struct {
+	EmbeddedImages map[string]image.URLs
+}
 
 // Image implements ContentRenderer
 func (r SimpleContentRenderer) Image(ctx context.Context, id string, index int) (ret string, err error) {
@@ -65,6 +71,11 @@ func (r SimpleContentRenderer) JumpURI(ctx context.Context, title, uri string) (
 // JumpPage implements ContentRenderer
 func (r SimpleContentRenderer) JumpPage(ctx context.Context, index int) (ret string, err error) {
 	return fmt.Sprintf(`<a href="#page-%d">page %d</a>`, index, index), nil
+}
+
+// EmbeddedImage implements ContentRenderer
+func (r SimpleContentRenderer) EmbeddedImage(ctx context.Context, id string) (ret string, err error) {
+	return fmt.Sprintf(`<img src="%s" />`, strings.Replace(r.EmbeddedImages[id].Regular, "//i.pximg.net", "//i.pixiv.cat", 1)), nil
 }
 
 func htmlContentLine(ctx context.Context, renderer ContentRenderer, line string, pageIndex *int) (ret string, err error) {
@@ -151,6 +162,20 @@ func htmlContentLine(ctx context.Context, renderer ContentRenderer, line string,
 				return
 			}
 			ret, err = renderer.JumpPage(ctx, index)
+			return
+		},
+	)
+	if err != nil {
+		return
+	}
+	ret = embeddedImagePattern.ReplaceAllStringFunc(
+		ret,
+		func(v string) (ret string) {
+			if err != nil {
+				return
+			}
+			match := embeddedImagePattern.FindStringSubmatch(v)
+			ret, err = renderer.EmbeddedImage(ctx, match[1])
 			return
 		},
 	)

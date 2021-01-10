@@ -103,7 +103,10 @@ func (i Novel) URL(ctx context.Context) *url.URL {
 	return client.For(ctx).EndpointURL("/novel/show.php", &url.Values{"id": {i.ID}})
 }
 
-// HTMLContent from content
+// HTMLContent from content, provide nil as renderer to use default renderer,
 func (i Novel) HTMLContent(ctx context.Context, renderer ContentRenderer) (string, error) {
+	if renderer == nil {
+		renderer = SimpleContentRenderer{EmbeddedImages: i.EmbeddedImages}
+	}
 	return HTMLContent(ctx, renderer, i.Content)
 }
