@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.6.0](https://github.com/NateScarlet/pixiv/compare/v0.5.1...v0.6.0) (2021-01-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **novel:** support embbed image for HTMLContent
+
+### Features
+
+* **novel:** add Novel.EmbeddedImages ([122555e](https://github.com/NateScarlet/pixiv/commit/122555efe3106c645f34d062321676f8f28d3fe4))
+* **novel:** support embbed image for HTMLContent ([7370243](https://github.com/NateScarlet/pixiv/commit/7370243cfc033569d4479c700269fbb4fc10896b))
+
+
+### Bug Fixes
+
+* **novel:** missing paragraph support for HTMLContent ([b90f32e](https://github.com/NateScarlet/pixiv/commit/b90f32ebcb67967d798023c233bd77d23aba36e4))
+
 ### [0.5.1](https://github.com/NateScarlet/pixiv/compare/v0.5.0...v0.5.1) (2021-01-10)
 
 
