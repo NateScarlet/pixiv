@@ -68,7 +68,10 @@ func (r SimpleContentRenderer) JumpPage(ctx context.Context, index int) (ret str
 }
 
 func htmlContentLine(ctx context.Context, renderer ContentRenderer, line string, pageIndex *int) (ret string, err error) {
-	ret = line
+	ret, err = renderer.Paragraph(ctx, line)
+	if err != nil {
+		return
+	}
 	ret = newPagePattern.ReplaceAllStringFunc(ret, func(s string) (ret string) {
 		*pageIndex++
 		ret, err = renderer.NewPage(ctx, *pageIndex)

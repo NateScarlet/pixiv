@@ -22,6 +22,11 @@ func TestHTMLContent(t *testing.T) {
 [newpage]
 [pixivimage:52200823-1]
 p1
+
+p2
+
+
+p3
 `,
 		)
 		require.NoError(t, err)
