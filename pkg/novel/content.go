@@ -32,9 +32,9 @@ type SimpleContentRenderer struct{}
 // Image implements ContentRenderer
 func (r SimpleContentRenderer) Image(ctx context.Context, id string, index int) (ret string, err error) {
 	if index < 1 {
-		return fmt.Sprintf(`<img src=" https://pixiv.cat/%s.jpg" />`, id), nil
+		return fmt.Sprintf(`<img src="https://pixiv.cat/%s.jpg" />`, id), nil
 	}
-	return fmt.Sprintf(`<img src=" https://pixiv.cat/%s-%d.jpg" />`, id, index), nil
+	return fmt.Sprintf(`<img src="https://pixiv.cat/%s-%d.jpg" />`, id, index), nil
 }
 
 // Paragraph implements ContentRenderer
