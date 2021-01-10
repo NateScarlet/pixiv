@@ -7,6 +7,15 @@ Pixiv go 客户端， 使用 PIXIV 网页 API。
 
 [设计文档](https://natescarlet.github.io/pixiv/)
 
+- [x] 画作搜索
+- [x] 画作排行榜
+- [x] 画作详情
+- [x] 小说搜索
+- [ ] 小说排行榜
+- [x] 小说详情
+- [x] 渲染小说为 HTML
+- [ ] 用户详情
+
 详细使用方法以代码注释为准
 
 ```go
