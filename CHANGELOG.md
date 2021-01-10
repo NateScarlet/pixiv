@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.6.1](https://github.com/NateScarlet/pixiv/compare/v0.6.0...v0.6.1) (2021-01-10)
+
+
+### Bug Fixes
+
+* **novel:** wrong jump page content html rendering ([4e99eb6](https://github.com/NateScarlet/pixiv/commit/4e99eb671154e8ef3fcc66c8d2cc73fdc59fd90d))
+
 ## [0.6.0](https://github.com/NateScarlet/pixiv/compare/v0.5.1...v0.6.0) (2021-01-10)
 
 
