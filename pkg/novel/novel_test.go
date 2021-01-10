@@ -6,9 +6,26 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NateScarlet/snapshot/pkg/snapshot"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func snapshotNovel(t *testing.T, novel Novel, opts ...snapshot.Option) {
+	snapshot.MatchJSON(
+		t,
+		novel,
+		append(
+			[]snapshot.Option{
+				snapshot.OptionCleanRegex(
+					snapshot.CleanAs(`"*count*"`),
+					`(?m)^\s*"(?:View|Like|Comment|Bookmark)Count": (\d+),?$`,
+				),
+			},
+			opts...,
+		)...,
+	)
+}
 
 func TestFetchNovel(t *testing.T) {
 	if os.Getenv("PIXIV_PHPSESSID") == "" {
@@ -34,4 +51,15 @@ func TestFetchNovel(t *testing.T) {
 	assert.GreaterOrEqual(t, i.ViewCount, int64(21955))
 	assert.GreaterOrEqual(t, i.BookmarkCount, int64(3690))
 	assert.Equal(t, "https://www.pixiv.net/novel/show.php?id=11983096", i.URL(ctx).String())
+}
+
+func TestFetchNovelWithEmbeddedImages(t *testing.T) {
+	if os.Getenv("PIXIV_PHPSESSID") == "" {
+		t.Skip("need login")
+	}
+	var ctx = context.Background()
+	i := Novel{ID: "14443124"}
+	err := i.Fetch(ctx)
+	require.NoError(t, err)
+	snapshotNovel(t, i)
 }

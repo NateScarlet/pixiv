@@ -24,7 +24,7 @@ uploadDate
 
     类型: string, rfc3339 日期
 
-    上传时间，有可能晚于创建时间是一样的。
+    上传时间，有可能晚于创建时间。
 
 coverUrl
 
@@ -64,6 +64,39 @@ viewCount
 bookmarkCount
 
     收藏数
+
+[textEmbeddedImages]: null | Record<string, object>
+
+    随小说上传的图片
+
+[textEmbeddedImages.{图片ID}]
+
+novelImageId: string
+
+    小说上传图片ID
+
+sl: string
+
+    不明，遇到的值有 0
+
+[textEmbeddedImages.{图片ID}.urls]
+
+480mw: string
+
+    最小宽度 480 px 的图片URL
+
+1200x1200: string
+
+    1200x1200 图片URL
+
+128x128: string
+
+    128x120 图片URL
+
+original: string
+
+    原始图片 URL
+
 
 小说插图
 ============

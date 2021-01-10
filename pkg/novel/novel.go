@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"github.com/NateScarlet/pixiv/pkg/client"
+	"github.com/NateScarlet/pixiv/pkg/image"
 	"github.com/NateScarlet/pixiv/pkg/user"
+	"github.com/tidwall/gjson"
 )
 
 // Series data
@@ -28,16 +30,17 @@ func (i Series) URL() *url.URL {
 
 // Novel data
 type Novel struct {
-	ID          string
-	Title       string
-	Description string
-	CoverURL    string
-	Content     string
-	Created     time.Time
-	Uploaded    time.Time
-	Author      user.User
-	Series      Series
-	Tags        []string
+	ID             string
+	Title          string
+	Description    string
+	CoverURL       string
+	Content        string
+	Created        time.Time
+	Uploaded       time.Time
+	Author         user.User
+	Series         Series
+	Tags           []string
+	EmbeddedImages map[string]image.URLs
 
 	TextCount     int64
 	PageCount     int64
@@ -79,6 +82,18 @@ func (i *Novel) Fetch(ctx context.Context) (err error) {
 		tags = append(tags, i.String())
 	}
 	i.Tags = tags
+	data.Get("textEmbeddedImages").ForEach(func(key, value gjson.Result) bool {
+		if i.EmbeddedImages == nil {
+			i.EmbeddedImages = make(map[string]image.URLs)
+		}
+		i.EmbeddedImages[key.String()] = image.URLs{
+			Thumb:    value.Get("urls.128x128").String(),
+			Small:    value.Get("urls.480mw").String(),
+			Regular:  value.Get("urls.1200x1200").String(),
+			Original: value.Get("urls.original").String(),
+		}
+		return true
+	})
 	i.Content = data.Get("content").String()
 	return
 }

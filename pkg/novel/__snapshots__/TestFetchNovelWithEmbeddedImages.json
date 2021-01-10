@@ -1,0 +1,56 @@
+{
+  "$Novel": {
+    "Author": {
+      "$User": {
+        "Avatar": {
+          "$URLs": {
+            "Mini": "",
+            "Original": "",
+            "Regular": "",
+            "Small": "",
+            "Thumb": ""
+          }
+        },
+        "ID": "789096",
+        "Name": "CHN^NateScarlet"
+      }
+    },
+    "BookmarkCount": "*count*",
+    "CommentCount": "*count*",
+    "Content": "[chapter:[[rb:本章标题 > 假名]]]\n[jump:2]\n[[jumpuri:标题 > http://example.com]]\n[newpage]\n[pixivimage:22238487]\n[newpage]\n[pixivimage:52200823-1]\np1\n\np2\n[uploadedimage:7477]\n\np3",
+    "CoverURL": "https://i.pximg.net/c/600x600/novel-cover-master/img/2021/01/10/22/59/38/14443124_770db50925b99f72192091b81fb4e169_master1200.jpg",
+    "Created": {
+      "$Time": "2021-01-10 13:59:38 +0000 +0000"
+    },
+    "Description": "for <a href=\"/jump.php?https%3A%2F%2Fgithub.com%2FNateScarlet%2Fpixiv\" target=\"_blank\">https://github.com/NateScarlet/pixiv</a>",
+    "EmbeddedImages": {
+      "7477": {
+        "$URLs": {
+          "Mini": "",
+          "Original": "https://i.pximg.net/novel-cover-original/img/2021/01/10/22/47/21/tei14736_2b060b6d13271530d5439f9dbdfe81af.png",
+          "Regular": "https://i.pximg.net/c/1200x1200/novel-cover-master/img/2021/01/10/22/47/21/tei14736_2b060b6d13271530d5439f9dbdfe81af_master1200.jpg",
+          "Small": "https://i.pximg.net/c/480x960/novel-cover-master/img/2021/01/10/22/47/21/tei14736_2b060b6d13271530d5439f9dbdfe81af_master1200.jpg",
+          "Thumb": "https://i.pximg.net/c/128x128/novel-cover-master/img/2021/01/10/22/47/21/tei14736_2b060b6d13271530d5439f9dbdfe81af_square1200.jpg"
+        }
+      }
+    },
+    "ID": "14443124",
+    "LikeCount": "*count*",
+    "PageCount": 3,
+    "Series": {
+      "$Series": {
+        "ID": "",
+        "Title": ""
+      }
+    },
+    "Tags": [
+      "オリジナル"
+    ],
+    "TextCount": 0,
+    "Title": "test target",
+    "Uploaded": {
+      "$Time": "2021-01-10 14:28:30 +0000 +0000"
+    },
+    "ViewCount": "*count*"
+  }
+}
