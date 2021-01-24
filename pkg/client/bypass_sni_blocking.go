@@ -83,6 +83,7 @@ func (t *BypassSNIBlockingTransport) ensureAntiSNIDetectTransport() http.RoundTr
 // BlockedHostnames constains hosts that blocked by sni detect.
 var BlockedHostnames = map[string]struct{}{
 	"www.pixiv.net": {},
+	"i.pximg.net":   {},
 }
 
 // RoundTrip implements http.RoundTripper
