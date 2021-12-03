@@ -16,7 +16,7 @@ func TestSearchNovel(t *testing.T) {
 	data := result.JSON
 	t.Log(data.Raw)
 	assert.Equal(t, false, data.Get("error").Bool())
-	assert.Empty(t, data.Get("message"))
+	assert.False(t, data.Get("message").Exists())
 	result.ForEach(func(key, value gjson.Result) bool {
 		assert.NotEmpty(t, value.Get("id"))
 		return true
