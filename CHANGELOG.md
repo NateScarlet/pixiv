@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+### [0.6.3](https://github.com/NateScarlet/pixiv/compare/v0.6.2...v0.6.3) (2021-12-03)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/natescarlet/snapshot to v0.6.0 ([5b2959c](https://github.com/NateScarlet/pixiv/commit/5b2959c53eecca4789c8c4a7cd04ba0ddf9ce583))
+* **deps:** update module github.com/puerkitobio/goquery to v1.7.0 ([361a1d8](https://github.com/NateScarlet/pixiv/commit/361a1d875419ea5257baf4a8cfa47987e669b7e0))
+* **deps:** update module github.com/puerkitobio/goquery to v1.7.1 ([ffff7a5](https://github.com/NateScarlet/pixiv/commit/ffff7a58dbef0994b6abce036321d35a017fca11))
+* **deps:** update module github.com/puerkitobio/goquery to v1.8.0 ([1f6fbe3](https://github.com/NateScarlet/pixiv/commit/1f6fbe369f9137a6a76ef12b46e289c6bca5ed38))
+* **deps:** update module github.com/tidwall/gjson to v1.10.0 ([ae81c1b](https://github.com/NateScarlet/pixiv/commit/ae81c1b0517544c4ff99f68256ae2aa5ecbb8a47))
+* **deps:** update module github.com/tidwall/gjson to v1.10.1 ([6ff031a](https://github.com/NateScarlet/pixiv/commit/6ff031a3e13191d4609f75a1bda3634e0f02ae5e))
+* **deps:** update module github.com/tidwall/gjson to v1.10.2 ([7f5f1af](https://github.com/NateScarlet/pixiv/commit/7f5f1af32c833f78e3b657a8de30e04189dfb9b6))
+* **deps:** update module github.com/tidwall/gjson to v1.12.1 ([25847df](https://github.com/NateScarlet/pixiv/commit/25847df93926bfc26ee630f8af403cc1b3ab4e92))
+* **deps:** update module github.com/tidwall/gjson to v1.7.0 ([396031c](https://github.com/NateScarlet/pixiv/commit/396031ce4077966f5c5d4b11e67ed5bd1600146d))
+* **deps:** update module github.com/tidwall/gjson to v1.7.1 ([fef6c0c](https://github.com/NateScarlet/pixiv/commit/fef6c0c4d76b9494443ae87394146ba4a821bc01))
+* **deps:** update module github.com/tidwall/gjson to v1.7.2 ([03f3bde](https://github.com/NateScarlet/pixiv/commit/03f3bde9eb88039bea69104b4ef8c9b511504f3c))
+* **deps:** update module github.com/tidwall/gjson to v1.7.3 ([3460365](https://github.com/NateScarlet/pixiv/commit/3460365374c27ec1a1b61352b919e90049f9bc0b))
+* **deps:** update module github.com/tidwall/gjson to v1.7.4 ([461f23e](https://github.com/NateScarlet/pixiv/commit/461f23e65ccb6ebcbfa1f4427baf30c510a44ce0))
+* **deps:** update module github.com/tidwall/gjson to v1.7.5 ([aec9c44](https://github.com/NateScarlet/pixiv/commit/aec9c44530e5a35a3c24af91ace44a2114f932bd))
+* **deps:** update module github.com/tidwall/gjson to v1.8.0 ([7c85f5c](https://github.com/NateScarlet/pixiv/commit/7c85f5cb8999004b5b9a8384c0bcc2eecb31c3ec))
+* **deps:** update module github.com/tidwall/gjson to v1.8.1 ([99c3753](https://github.com/NateScarlet/pixiv/commit/99c3753c18fc7a0c150332bacbbe29f6a32869fe))
+* **deps:** update module github.com/tidwall/gjson to v1.9.0 ([e565fd3](https://github.com/NateScarlet/pixiv/commit/e565fd3016be7a9032bfaef7f43cbef916450890))
+* **deps:** update module github.com/tidwall/gjson to v1.9.1 ([0112788](https://github.com/NateScarlet/pixiv/commit/0112788d5fdf0c94bd0c7c3513d7e8ced972a544))
+* **deps:** update module github.com/tidwall/gjson to v1.9.2 ([0558b32](https://github.com/NateScarlet/pixiv/commit/0558b32b4d2b0e0036a108ec11a2690c1180ef60))
+* **deps:** update module github.com/tidwall/gjson to v1.9.3 ([1a3d808](https://github.com/NateScarlet/pixiv/commit/1a3d8088d11af6b1b37b188e7620bab317265041))
+* **deps:** update module github.com/tidwall/gjson to v1.9.4 ([327b84a](https://github.com/NateScarlet/pixiv/commit/327b84aaeb1fa73aba19a8d907929587cf5e6e52))
+
 ### [0.6.2](https://github.com/NateScarlet/pixiv/compare/v0.6.1...v0.6.2) (2021-01-24)
 
 
