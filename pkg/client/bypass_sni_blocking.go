@@ -1,9 +1,11 @@
 package client
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"net"
 	"net/http"
 	"sync"
@@ -12,6 +14,7 @@ import (
 
 // BypassSNIBlockingTransport bypass sni bloking when host in BlockedHostnames
 type BypassSNIBlockingTransport struct {
+	c                      *Client
 	wrapped                http.RoundTripper
 	antiSNIDetectTransport http.RoundTripper
 	mu                     sync.Mutex
@@ -35,11 +38,14 @@ func (t *BypassSNIBlockingTransport) ensureAntiSNIDetectTransport() http.RoundTr
 			if err != nil {
 				return nil, err
 			}
-			ip, err := resolveHostname(host)
+			ip, err := t.c.ensureDNSResolver().Resolve(context.Background(), host)
 			if err != nil {
 				return nil, err
 			}
-			return tls.Dial(network, net.JoinHostPort(ip, port), &tls.Config{
+			if len(ip) == 0 {
+				return nil, fmt.Errorf("empty dns resolve result for '%s'", host)
+			}
+			return tls.Dial(network, net.JoinHostPort(ip[0].String(), port), &tls.Config{
 				InsecureSkipVerify: true,
 				VerifyPeerCertificate: func(certificates [][]byte, _ [][]*x509.Certificate) (err error) {
 					certs := make([]*x509.Certificate, len(certificates))
@@ -98,5 +104,5 @@ func (t *BypassSNIBlockingTransport) RoundTrip(req *http.Request) (resp *http.Re
 // BypassSNIBlocking wrap current transport with bypass sni blocking support.
 // must set before other settings, because it use a new http.Transport for blocked host
 func (c *Client) BypassSNIBlocking() {
-	c.Transport = &BypassSNIBlockingTransport{wrapped: c.Transport}
+	c.Transport = &BypassSNIBlockingTransport{wrapped: c.Transport, c: c}
 }

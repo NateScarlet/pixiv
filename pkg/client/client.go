@@ -7,14 +7,15 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"os"
 
+	"github.com/NateScarlet/pixiv/pkg/client/dns"
 	"github.com/tidwall/gjson"
 )
 
 // Client to send request to pixiv server.
 type Client struct {
-	ServerURL string
+	ServerURL   string
+	DNSResolver dns.Resolver
 	http.Client
 }
 
@@ -64,21 +65,4 @@ func ParseAPIResult(r io.Reader) (ret gjson.Result, err error) {
 		err = fmt.Errorf("pixiv: client: api error: %s", message)
 	}
 	return
-}
-
-// Default client auto login with PIXIV_PHPSESSID env var.
-var Default = new(Client)
-
-// DefaultUserAgent for new clients
-var DefaultUserAgent = os.Getenv("PIXIV_USER_AGENT")
-
-func init() {
-	if DefaultUserAgent == "" {
-		DefaultUserAgent = `Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0`
-	}
-	if os.Getenv("PIXIV_BYPASS_SNI_BLOCKING") != "" {
-		Default.BypassSNIBlocking()
-	}
-	Default.SetPHPSESSID(os.Getenv("PIXIV_PHPSESSID"))
-	Default.SetDefaultHeader("User-Agent", DefaultUserAgent)
 }
