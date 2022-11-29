@@ -28,7 +28,7 @@ func TestArtworkRankSimple(t *testing.T) {
 	}
 	err = rank.Fetch(context.Background())
 	require.NoError(t, err)
-	assert.GreaterOrEqual(t, len(rank.Items), 48)
+	assert.GreaterOrEqual(t, len(rank.Items), 47)
 	for _, item := range rank.Items {
 		assert.NotEmpty(t, item.Rank)
 		assert.NotEmpty(t, item.Artwork.ID)
