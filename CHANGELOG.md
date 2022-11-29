@@ -2,6 +2,29 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.7.0](https://github.com/NateScarlet/pixiv/compare/v0.6.3...v0.7.0) (2022-11-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* **client:** allow custom dns resolver
+
+### Features
+
+* **client:** allow custom dns resolver ([5d17188](https://github.com/NateScarlet/pixiv/commit/5d17188ab3816212163f7f8f35b956ee000d1a78))
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/stretchr/testify to v1.7.1 ([b69391e](https://github.com/NateScarlet/pixiv/commit/b69391e9c7d5574a712799823a0f909ba8dab457))
+* **deps:** update module github.com/stretchr/testify to v1.7.2 ([3134be6](https://github.com/NateScarlet/pixiv/commit/3134be69ef9364e08050bf93e37bdf08ab5d3668))
+* **deps:** update module github.com/stretchr/testify to v1.7.3 ([a1f5045](https://github.com/NateScarlet/pixiv/commit/a1f5045c3173463efd1a2445c81374aa5a2bbd06))
+* **deps:** update module github.com/stretchr/testify to v1.7.4 ([352ac69](https://github.com/NateScarlet/pixiv/commit/352ac69b5e296b4cc0f82483d7c8e46cfa3673c2))
+* **deps:** update module github.com/tidwall/gjson to v1.13.0 ([7d74d94](https://github.com/NateScarlet/pixiv/commit/7d74d94a5ad51d4c36d877b139eb570747061f4c))
+* **deps:** update module github.com/tidwall/gjson to v1.14.0 ([1a019ca](https://github.com/NateScarlet/pixiv/commit/1a019cac279028f5c63873c67ca702b4e62f5438))
+* **deps:** update module github.com/tidwall/gjson to v1.14.1 ([41f5ab9](https://github.com/NateScarlet/pixiv/commit/41f5ab969bb151321059c037bd8b9c1ea44538fe))
+* **deps:** update module github.com/tidwall/gjson to v1.14.3 ([1073335](https://github.com/NateScarlet/pixiv/commit/1073335c3bf055f37eb369bdcb3a2937b3873174))
+
 ### [0.6.3](https://github.com/NateScarlet/pixiv/compare/v0.6.2...v0.6.3) (2021-12-03)
 
 
