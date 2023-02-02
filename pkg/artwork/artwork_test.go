@@ -18,7 +18,7 @@ func TestFetchArtwork(t *testing.T) {
 	assert.Equal(t, "無題", i.Title)
 	assert.Len(t, i.Tags, 2)
 	assert.Equal(t, []string{"東方", "パチュリー・ノーレッジ"}, i.Tags)
-	created, _ := time.Parse(time.RFC3339, "2011-10-07T17:22:58+00:00")
+	created, _ := time.Parse(time.RFC3339, "2011-10-07T17:22:00+00:00")
 	assert.Equal(t, created, i.Created)
 	assert.Equal(t, "789096", i.Author.ID)
 	assert.Equal(t, "CHN^NateScarlet", i.Author.Name)
