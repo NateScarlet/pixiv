@@ -99,7 +99,7 @@ var (
 )
 
 // SearchOptions for Search
-// see SearchOption* functions for documention.
+// see SearchOption* functions for documentation.
 type SearchOptions struct {
 	Page              int
 	Order             Order
@@ -114,7 +114,7 @@ type SearchOptions struct {
 // SearchOption mutate SearchOptions
 type SearchOption func(*SearchOptions)
 
-// SearchOptionPage change page to retrive
+// SearchOptionPage change page to retrieve
 func SearchOptionPage(page int) SearchOption {
 	return func(so *SearchOptions) {
 		so.Page = page
