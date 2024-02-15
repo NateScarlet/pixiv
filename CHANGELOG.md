@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.7.1](https://github.com/NateScarlet/pixiv/compare/v0.7.0...v0.7.1) (2024-02-15)
+
+
+### Bug Fixes
+
+* **deps:** update module github.com/puerkitobio/goquery to v1.8.1 ([b682304](https://github.com/NateScarlet/pixiv/commit/b682304147878fc208a6d8a9f5a912571938adb1))
+* **deps:** update module github.com/stretchr/testify to v1.8.2 ([10a0b8d](https://github.com/NateScarlet/pixiv/commit/10a0b8dc9793f49ec12bd9799c64e1324cd90ac7))
+* **deps:** update module github.com/tidwall/gjson to v1.14.4 ([8e990de](https://github.com/NateScarlet/pixiv/commit/8e990de1124304256aca25235766c673442e8b64))
+* **deps:** update module github.com/tidwall/gjson to v1.15.0 ([8cd97e9](https://github.com/NateScarlet/pixiv/commit/8cd97e9ddcfb9f1a85f64bf1c939dd0b1f725d14))
+* **deps:** update module github.com/tidwall/gjson to v1.16.0 ([934a944](https://github.com/NateScarlet/pixiv/commit/934a944de0f85d9817223387624027c5240920d3))
+* **deps:** update module github.com/tidwall/gjson to v1.17.0 ([53dd994](https://github.com/NateScarlet/pixiv/commit/53dd994941cb5475ff01b25d41de2e1ffc63de9e))
+* **deps:** update module github.com/tidwall/gjson to v1.17.1 ([4d1d252](https://github.com/NateScarlet/pixiv/commit/4d1d252c04ed95b93249825e382f375928f556b1))
+
 ## [0.7.0](https://github.com/NateScarlet/pixiv/compare/v0.6.3...v0.7.0) (2022-11-29)
 
 
