@@ -18,6 +18,8 @@ Pixiv go 客户端， 使用 PIXIV 网页 API。
 
 详细使用方法以代码注释为准
 
+2024-08-27: 账号密码登录方式已失效，手动登录获取 PHPSESSID 代替
+
 ```go
 package main
 
@@ -38,11 +40,6 @@ client.Default
 c := &client.Client{}
 c.SetDefaultHeader("User-Agent", client.DefaultUserAgent)
 c.SetPHPSESSID("PHPSESSID")
-
-// 通过账号密码登录(可能触发 reCAPTCHA)。
-c := &client.Client{}
-c.SetDefaultHeader("User-Agent", client.DefaultUserAgent)
-c.Login("username", "password")
 
 // 启用免代理，环境变量 `PIXIV_BYPASS_SNI_BLOCKING` 不为空时自动为默认客户端启用免代理。
 // 当前实现需求一个 DNS over HTTPS 服务，默认使用 cloudflare，可通过 `PIXIV_DNS_QUERY_URL` 环境变量设置。
