@@ -25,6 +25,7 @@ package main
 
 import (
     "context"
+    "slices"
 
     "github.com/NateScarlet/pixiv/pkg/client"
     "github.com/NateScarlet/pixiv/pkg/artwork"
@@ -59,9 +60,9 @@ result.Artworks() // []artwork.Artwork，只有部分数据，通过 `Fetch` `Fe
 artwork.Search(ctx, "パチュリー・ノーレッジ", artwork.SearchOptionPage(2)) // 获取第二页
 
 // 画作详情
-i := &artwork.Artwork{ID: "22238487"}
-err := i.Fetch(ctx) // 获取画作详情(不含分页), 直接更新 struct 数据。
-err := i.FetchPages(ctx) // 获取画作分页, 直接更新 struct 数据。
+payload, err := artwork.Fetch(ctx, "22238487") // 获取画作详情(不含分页)
+slices.Collect(payload.Tags()) // 获取标签。使用迭代器不额外储存数组，如果需要数组可以用 slices.Collect
+payload, err := artwork.FetchPages(ctx, "22238487") // 获取画作分页
 
 // 画作排行榜
 rank := &artwork.Rank{Mode: "daily"}

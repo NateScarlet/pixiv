@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -46,6 +47,26 @@ func (c *Client) GetWithContext(ctx context.Context, url string) (resp *http.Res
 	return c.Do(req)
 }
 
+func ParseAPIResponse(r io.Reader) (_ json.RawMessage, err error) {
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return
+	}
+	if !gjson.ValidBytes(data) {
+		err = fmt.Errorf("pixiv: client: invalid json: %q", string(data))
+		return
+	}
+	var res = gjson.ParseBytes(data)
+	hasError := res.Get("error").Bool()
+	message := res.Get("message").String()
+	res = res.Get("body")
+	if hasError {
+		err = fmt.Errorf("pixiv: client: api error: %s", message)
+	}
+	return
+}
+
+// Deprecated: use [ParseAPIResponse] instead.
 // ParseAPIResult parses error from json api response, and returns body part.
 func ParseAPIResult(r io.Reader) (ret gjson.Result, err error) {
 	data, err := ioutil.ReadAll(r)

@@ -19,6 +19,7 @@ type Page struct {
 	Height int64
 }
 
+// Deprecated: use [Fetch] instead.
 // Artwork data
 type Artwork struct {
 	ID          string
@@ -42,6 +43,7 @@ type Artwork struct {
 	Pages []Page
 }
 
+// Deprecated: use [Fetch] instead.
 // Fetch additional data from pixiv single artwork api,
 func (i *Artwork) Fetch(ctx context.Context) (err error) {
 	if i.ID == "" {
@@ -83,6 +85,7 @@ func (i *Artwork) Fetch(ctx context.Context) (err error) {
 	return
 }
 
+// Deprecated: use [FetchPages] instead.
 // FetchPages get all pages for artwork from pixiv artwork pages api,
 func (i *Artwork) FetchPages(ctx context.Context) (err error) {
 	if i.ID == "" {
