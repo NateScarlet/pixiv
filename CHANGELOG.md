@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.7.2](https://github.com/NateScarlet/pixiv/compare/v0.7.1...v0.7.2) (2025-04-03)
+
+
+### Bug Fixes
+
+* **artwork:** wrong response parsing ([08d4fcb](https://github.com/NateScarlet/pixiv/commit/08d4fcb79442da3fec6a27eedeacae8575bf3a56))
+* **client:** ParseAPIResponse never returns data ([693781e](https://github.com/NateScarlet/pixiv/commit/693781e606864abebac0915fad80b48e29ec3af2))
+
 ## [0.7.1](https://github.com/NateScarlet/pixiv/compare/v0.7.0...v0.7.1) (2025-04-03)
 
 
