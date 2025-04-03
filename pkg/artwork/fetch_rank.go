@@ -180,6 +180,10 @@ type ItemInFetchRankPayload struct {
 	raw json.RawMessage
 }
 
+func (p ItemInFetchRankPayload) Raw() json.RawMessage {
+	return p.raw
+}
+
 func (i ItemInFetchRankPayload) get(path string) gjson.Result {
 	return gjson.GetBytes(i.raw, path)
 }
