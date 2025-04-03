@@ -93,12 +93,8 @@ func FetchRank(ctx context.Context, mode RankMode, options ...FetchRankOption) (
 	}
 
 	return FetchRankPayload{
-		mode:    mode,
-		content: opts.content,
-		date:    opts.date,
-		page:    opts.page,
-		raw:     raw,
-		resp:    resp,
+		raw:  raw,
+		resp: resp,
 	}, nil
 }
 
@@ -139,12 +135,8 @@ func FetchRankWithPage(page int) FetchRankOption {
 // FetchRankPayload contains raw ranking data
 // FetchRankPayload 包含原始排行榜数据
 type FetchRankPayload struct {
-	mode    RankMode
-	content ContentType
-	date    time.Time
-	page    int
-	raw     json.RawMessage
-	resp    *http.Response
+	raw  json.RawMessage
+	resp *http.Response
 }
 
 // URL returns the web page URL for this ranking list
@@ -158,30 +150,6 @@ func (p FetchRankPayload) URL() *url.URL {
 	q.Del("format")
 	u.RawQuery = q.Encode()
 	return &u
-}
-
-// Mode returns ranking list type
-// Mode 返回排行榜类型
-func (p FetchRankPayload) Mode() RankMode {
-	return p.mode
-}
-
-// Content returns filtered content type
-// Content 返回筛选的内容类型
-func (p FetchRankPayload) Content() ContentType {
-	return p.content
-}
-
-// Date returns ranking date criteria
-// Date 返回排行榜日期条件
-func (p FetchRankPayload) Date() time.Time {
-	return p.date
-}
-
-// Page returns current page number
-// Page 返回当前页码
-func (p FetchRankPayload) Page() int {
-	return p.page
 }
 
 // Raw returns original JSON data
