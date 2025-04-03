@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"iter"
 	"net/http"
 	"net/url"
@@ -86,12 +87,10 @@ func FetchRank(ctx context.Context, mode RankMode, options ...FetchRankOption) (
 		return
 	}
 	defer resp.Body.Close()
-
-	raw, err := client.ParseAPIResponse(resp.Body)
+	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return
 	}
-
 	return FetchRankPayload{
 		raw:  raw,
 		resp: resp,
