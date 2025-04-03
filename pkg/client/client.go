@@ -61,9 +61,9 @@ func ParseAPIResponse(r io.Reader) (_ json.RawMessage, err error) {
 	message := res.Get("message").String()
 	res = res.Get("body")
 	if hasError {
-		err = fmt.Errorf("pixiv: client: api error: %s", message)
+		return data, fmt.Errorf("pixiv: client: api error: %s", message)
 	}
-	return
+	return json.RawMessage(res.Raw), err
 }
 
 // Deprecated: use [ParseAPIResponse] instead.
