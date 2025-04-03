@@ -65,11 +65,8 @@ slices.Collect(payload.Tags()) // 获取标签。使用迭代器不额外储存�
 payload, err := artwork.FetchPages(ctx, "22238487") // 获取画作分页
 
 // 画作排行榜
-rank := &artwork.Rank{Mode: "daily"}
-rank.Fetch(ctx)
-rank.Items[0].Rank
-rank.Items[0].PreviousRank
-rank.Items[0].Artwork
+payload, err := artwork.FetchRank(ctx, artwork.DailyRank)
+payload, err := artwork.FetchRank(ctx, artwork.DailyRank, artwork.FetchRankWithPage(2)) // 第二页
 
 // 搜索小说
 result, err := novel.Search(ctx, "パチュリー・ノーレッジ")

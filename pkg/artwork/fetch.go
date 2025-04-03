@@ -83,7 +83,11 @@ const (
 // Type returns the artwork content type classification
 // Type 返回作品内容类型分类
 func (p FetchPayload) Type() ContentType {
-	switch val := p.get("illustType").Int(); val {
+	return parseContentType(p.get("illustType"))
+}
+
+func parseContentType(v gjson.Result) ContentType {
+	switch v.Int() {
 	case 0:
 		return Illust
 	case 1:

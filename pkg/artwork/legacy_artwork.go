@@ -12,6 +12,7 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+// Deprecated: use [FetchPages] instead.
 // Page is a artwork page.
 type Page struct {
 	Image  image.URLs

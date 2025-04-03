@@ -12,6 +12,7 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+// Deprecated: use [FetchRank] instead.
 // RankItem contains artwork and rank info.
 type RankItem struct {
 	Artwork
@@ -20,6 +21,7 @@ type RankItem struct {
 	JSON         gjson.Result
 }
 
+// Deprecated: use [FetchRank] instead.
 // Rank contains data for one rank page.
 type Rank struct {
 	/* required, possible rank modes:
@@ -74,6 +76,7 @@ func (rank Rank) URL(ctx context.Context) *url.URL {
 	return rank.URLWithQuery(ctx, nil)
 }
 
+// Deprecated: use [FetchRank] instead.
 // Fetch rank
 func (rank *Rank) Fetch(ctx context.Context) (err error) {
 	resp, err := client.For(ctx).GetWithContext(ctx, rank.URLWithQuery(ctx, &url.Values{"format": {"json"}}).String())
