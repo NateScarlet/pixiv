@@ -53,20 +53,42 @@ c.SetDefaultHeader("User-Agent", client.DefaultUserAgent)
 var ctx = context.Background()
 ctx = client.With(ctx, c)
 
-// 搜索画作
-result, err := artwork.Search(ctx, "パチュリー・ノーレッジ")
-result.JSON // json return data.
-result.Artworks() // []artwork.Artwork，只有部分数据，通过 `Fetch` `FetchPages` 方法获取完整数据。
-artwork.Search(ctx, "パチュリー・ノーレッジ", artwork.SearchOptionPage(2)) // 获取第二页
+// 搜索画作 (默认最新排序)
+payload, _ := artwork.SearchV2(ctx, "パチュリー・ノーレッジ")
+for item := range payload.Items() {
+    fmt.Println(item.Title(), "by", item.AuthorName())
+}
 
-// 画作详情
-payload, err := artwork.Fetch(ctx, "22238487") // 获取画作详情(不含分页)
-slices.Collect(payload.Tags()) // 获取标签。使用迭代器不额外储存数组，如果需要数组可以用 slices.Collect
-payload, err := artwork.FetchPages(ctx, "22238487") // 获取画作分页
+// 高级搜索 (带过滤选项)
+payload, _ := artwork.SearchV2(ctx, "パチュリー・ノーレッジ",
+    artwork.SearchWithPage(3),              // 第3页
+    artwork.SearchWithContentRating(artwork.R18Content),
+    artwork.SearchWithMode(artwork.PartialTagSearch)
+)
 
-// 画作排行榜
-payload, err := artwork.FetchRank(ctx, artwork.DailyRank)
-payload, err := artwork.FetchRank(ctx, artwork.DailyRank, artwork.FetchRankWithPage(2)) // 第二页
+// 获取排行榜
+rank, _ := artwork.FetchRank(ctx,
+    artwork.DailyRank,                     // 每日榜
+    artwork.FetchRankWithDate(yesterday),  // 指定日期
+    artwork.FetchRankWithPage(2)           // 第二页
+)
+for item := range rank.Items() {
+    fmt.Printf("第%d名: %s", item.Position(), item.Title())
+}
+
+// 获取画作元数据
+art, _ := artwork.Fetch(ctx, "22238487")
+fmt.Println("作品描述:", art.Description())
+for tag := range art.Tags() {
+    fmt.Println("标签:", tag)
+}
+fmt.Println("查看网页版:", art.URL().String())
+
+// 获取画作全部分页
+pages, _ := artwork.FetchPages(ctx, "22238487")
+for page := range pages.Pages() {
+    fmt.Println("原图地址:", page.OriginalURL())
+}
 
 // 搜索小说
 result, err := novel.Search(ctx, "パチュリー・ノーレッジ")

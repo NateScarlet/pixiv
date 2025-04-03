@@ -2,215 +2,306 @@ package artwork
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
+	"iter"
+	"net/http"
 	"net/url"
 	"strconv"
 
 	"github.com/NateScarlet/pixiv/pkg/client"
-	"github.com/NateScarlet/pixiv/pkg/image"
-	"github.com/NateScarlet/pixiv/pkg/user"
 	"github.com/tidwall/gjson"
 )
 
-// SearchResult holds search data and provide useful methods.
-type SearchResult struct {
-	JSON gjson.Result
-}
-
-// ForEach iterates through values. skips advertisement container item.
-func (r SearchResult) ForEach(iterator func(key gjson.Result, value gjson.Result) bool) {
-	r.JSON.Get("illustManga.data").ForEach(func(key gjson.Result, value gjson.Result) bool {
-		if value.Get("isAdContainer").Bool() {
-			return true
-		}
-		return iterator(key, value)
-	})
-
-}
-
-// Artworks appeared in search result.
-func (r SearchResult) Artworks() []Artwork {
-	ret := []Artwork{}
-	r.ForEach(func(key, value gjson.Result) bool {
-		a := Artwork{
-			ID:    value.Get("id").String(),
-			Title: value.Get("title").String(),
-			Type:  value.Get("illustType").String(),
-			Author: user.User{
-				ID:   value.Get("userId").String(),
-				Name: value.Get("userName").String(),
-				Avatar: image.URLs{
-					Mini: value.Get("profileImageUrl").String(),
-				},
-			},
-			Description: value.Get("description").String(),
-			Image: image.URLs{
-				Thumb: value.Get("url").String(),
-			},
-			PageCount: value.Get("pageCount").Int(),
-		}
-		tagsData := value.Get("tags").Array()
-		tags := make([]string, len(tagsData))
-		for index, v := range tagsData {
-			tags[index] = v.String()
-		}
-		a.Tags = tags
-		ret = append(ret, a)
-		return true
-	})
-	return ret
-
-}
-
-// Order for search result
-type Order string
-
-// orders
-var (
-	// date descending (default)
-	OrderDateDSC Order = ""
-	// date ascending
-	OrderDateASC Order = "date"
-)
-
-// ContentRating of a artwork
-type ContentRating string
-
-// content ratings
-var (
-	// all content (default)
-	ContentRatingAll ContentRating = ""
-	// content that suitable for all ages
-	ContentRatingSafe ContentRating = "safe"
-	// restricted r18+ content
-	ContentRatingR18 ContentRating = "r18"
-)
-
-// SearchMode to match artwork
-type SearchMode string
-
-// search modes
-var (
-	// exact tag match (default)
-	SearchModeTag SearchMode = ""
-	// partial tag match
-	SearchModePartialTag SearchMode = "s_tag"
-	// title or caption match
-	SearchModeTitleOrCaption SearchMode = "s_tc"
-)
-
-// SearchOptions for Search
-// see SearchOption* functions for documentation.
-type SearchOptions struct {
-	Page              int
-	Order             Order
-	ContentRating     ContentRating
-	Mode              SearchMode
-	WidthLessThan     int64
-	WidthGreaterThan  int64
-	HeightLessThan    int64
-	HeightGreaterThan int64
-}
-
-// SearchOption mutate SearchOptions
-type SearchOption func(*SearchOptions)
-
-// SearchOptionPage change page to retrieve
-func SearchOptionPage(page int) SearchOption {
-	return func(so *SearchOptions) {
-		so.Page = page
-	}
-}
-
-// SearchOptionOrder change result order
-func SearchOptionOrder(order Order) SearchOption {
-	return func(so *SearchOptions) {
-		so.Order = order
-	}
-}
-
-// SearchOptionContentRating filter result by content rating
-func SearchOptionContentRating(rating ContentRating) SearchOption {
-	return func(so *SearchOptions) {
-		so.ContentRating = rating
-	}
-}
-
-// SearchOptionMode change search mode
-func SearchOptionMode(mode SearchMode) SearchOption {
-	return func(so *SearchOptions) {
-		so.Mode = mode
-	}
-}
-
-// SearchOptionResolution filter result by original image resolution,
-// use 0 to unset limit.
-func SearchOptionResolution(
-	widthLessThan,
-	widthGreaterThan,
-	heightLessThan,
-	heightGreaterThan int64,
-) SearchOption {
-	return func(so *SearchOptions) {
-		so.WidthLessThan = widthLessThan
-		so.WidthGreaterThan = widthGreaterThan
-		so.HeightLessThan = heightLessThan
-		so.HeightGreaterThan = heightGreaterThan
-	}
-}
-
-// Search calls pixiv artwork search api.
-func Search(ctx context.Context, query string, opts ...SearchOption) (result SearchResult, err error) {
-	var args = new(SearchOptions)
-	for _, i := range opts {
-		i(args)
+// SearchV2 performs artwork search
+// SearchV2 执行作品搜索
+func SearchV2(ctx context.Context, query string, options ...SearchV2Option) (_ SearchPayload, err error) {
+	if query == "" {
+		return SearchPayload{}, errors.New("search query required")
 	}
 
-	if args.Page < 1 {
-		args.Page = 1
+	opts := newSearchV2Options(options...)
+	q := make(url.Values)
+
+	if opts.page > 1 {
+		q.Set("p", strconv.Itoa(opts.page))
+	}
+	if opts.contentRating != "" {
+		q.Set("mode", string(opts.contentRating))
+	}
+	if opts.order != "" {
+		q.Set("order", string(opts.order))
+	}
+	if opts.mode != "" {
+		q.Set("s_mode", string(opts.mode))
+	}
+	if opts.widthLt > 0 {
+		q.Set("wlt", strconv.FormatInt(opts.widthLt, 10))
+	}
+	if opts.widthGt > 0 {
+		q.Set("wgt", strconv.FormatInt(opts.widthGt, 10))
+	}
+	if opts.heightLt > 0 {
+		q.Set("hlt", strconv.FormatInt(opts.heightLt, 10))
+	}
+	if opts.heightGt > 0 {
+		q.Set("hgt", strconv.FormatInt(opts.heightGt, 10))
 	}
 
-	q := url.Values{}
-	if args.Page != 1 {
-		q.Set("p", strconv.Itoa(args.Page))
-	}
-	if args.ContentRating != "" {
-		q.Set("mode", string(args.ContentRating))
-	}
-	if args.Order != "" {
-		q.Set("order", string(args.Order))
-	}
-	if args.Mode != "" {
-		q.Set("s_mode", string(args.Mode))
-	}
-	if args.WidthLessThan > 1 {
-		q.Set("wlt", strconv.FormatInt(args.WidthLessThan, 10))
-	}
-	if args.WidthGreaterThan > 1 {
-		q.Set("wgt", strconv.FormatInt(args.WidthGreaterThan, 10))
-	}
-	if args.HeightLessThan > 1 {
-		q.Set("hlt", strconv.FormatInt(args.HeightLessThan, 10))
-	}
-	if args.HeightGreaterThan > 1 {
-		q.Set("hgt", strconv.FormatInt(args.HeightGreaterThan, 10))
-	}
-
-	var c = client.For(ctx)
-	resp, err := c.GetWithContext(ctx, c.EndpointURL(
-		"/ajax/search/artworks/"+query,
-		&q,
-	).String())
-
+	c := client.For(ctx)
+	resp, err := c.GetWithContext(ctx, c.EndpointURL("/ajax/search/artworks/"+url.PathEscape(query), &q).String())
 	if err != nil {
 		return
 	}
 	defer resp.Body.Close()
-	body, err := client.ParseAPIResult(resp.Body)
+
+	raw, err := client.ParseAPIResponse(resp.Body)
 	if err != nil {
 		return
 	}
-	result = SearchResult{
-		JSON: body,
-	}
-	return
+
+	return SearchPayload{
+		raw:  raw,
+		resp: resp,
+	}, nil
 }
+
+// SearchPayload contains search result data
+// SearchPayload 包含搜索结果数据
+type SearchPayload struct {
+	raw  json.RawMessage
+	resp *http.Response
+}
+
+func (p SearchPayload) Raw() json.RawMessage {
+	return p.raw
+}
+
+func (p SearchPayload) Response() *http.Response {
+	return p.resp
+}
+
+// Items iterates through search results
+// Items 遍历搜索结果条目
+func (p SearchPayload) Items() iter.Seq[ItemInSearchPayload] {
+	return func(yield func(ItemInSearchPayload) bool) {
+		result := gjson.GetBytes(p.raw, "illustManga.data")
+		result.ForEach(func(_, value gjson.Result) bool {
+			if value.Get("isAdContainer").Bool() {
+				return true // Skip ads
+			}
+			return yield(ItemInSearchPayload{raw: json.RawMessage(value.Raw)})
+		})
+	}
+}
+
+// ItemInSearchPayload represents single search result
+// ItemInSearchPayload 表示单个搜索结果
+type ItemInSearchPayload struct {
+	raw json.RawMessage
+}
+
+func (p ItemInSearchPayload) Raw() json.RawMessage {
+	return p.raw
+}
+
+func (i ItemInSearchPayload) get(path string) gjson.Result {
+	return gjson.GetBytes(i.raw, path)
+}
+
+// ID returns artwork identifier
+// ID 返回作品ID
+func (i ItemInSearchPayload) ID() string {
+	return i.get("id").String()
+}
+
+// Title returns artwork title
+// Title 返回作品标题
+func (i ItemInSearchPayload) Title() string {
+	return i.get("title").String()
+}
+
+// Type returns artwork content type
+// Type 返回作品内容类型
+func (i ItemInSearchPayload) Type() ContentType {
+	return parseContentType(i.get("illustType"))
+}
+
+// Description returns HTML formatted description
+// Description 返回HTML格式描述
+func (i ItemInSearchPayload) Description() string {
+	return i.get("description").String()
+}
+
+// MaxWidth250URL returns the thumbnail URL (max 250px width).
+// MaxWidth250URL 返回最大250px宽度的缩略图URL。
+func (i ItemInSearchPayload) MaxWith250URL() string {
+	return i.get("url").String()
+}
+
+// AuthorID returns creator's user ID
+// AuthorID 返回作者用户ID
+func (i ItemInSearchPayload) AuthorID() string {
+	return i.get("userId").String()
+}
+
+// AuthorName returns creator's display name
+// AuthorName 返回作者显示名称
+func (i ItemInSearchPayload) AuthorName() string {
+	return i.get("userName").String()
+}
+
+// AuthorProfileImageURL returns creator's profile image URL
+// AuthorProfileImageURL 返回作者头像URL
+func (i ItemInSearchPayload) AuthorProfileImageURL() string {
+	return i.get("profileImageUrl").String()
+}
+
+// PageCount returns total number of pages
+// PageCount 返回作品总页数
+func (i ItemInSearchPayload) PageCount() int {
+	return int(i.get("pageCount").Int())
+}
+
+// Tags returns associated tags
+// Tags 返回关联标签
+func (i ItemInSearchPayload) Tags() iter.Seq[string] {
+	return func(yield func(string) bool) {
+		i.get("tags").ForEach(func(_, v gjson.Result) bool {
+			return yield(v.String())
+		})
+	}
+}
+
+// SearchOption configures search parameters
+// SearchOption 配置搜索参数
+type SearchV2Option func(*SearchV2Options)
+
+// SearchWithPage sets result page number
+// SearchWithPage 设置结果页码
+func SearchWithPage(page int) SearchV2Option {
+	return func(so *SearchV2Options) {
+		so.page = page
+	}
+}
+
+// SearchWithOrder sets sorting order
+// SearchWithOrder 设置排序方式
+func SearchWithOrder(order Order) SearchV2Option {
+	return func(so *SearchV2Options) {
+		so.order = order
+	}
+}
+
+// SearchWithContentRating filters by content rating
+// SearchWithContentRating 按内容分级筛选
+func SearchWithContentRating(rating ContentRating) SearchV2Option {
+	return func(so *SearchV2Options) {
+		so.contentRating = rating
+	}
+}
+
+// SearchWithMode sets search matching mode
+// SearchWithMode 设置搜索匹配模式
+func SearchWithMode(mode SearchMode) SearchV2Option {
+	return func(so *SearchV2Options) {
+		so.mode = mode
+	}
+}
+
+// SearchWithResolution filters by image dimensions
+// SearchWithResolution 按图像尺寸筛选
+func SearchWithResolution(minWidth, maxWidth, minHeight, maxHeight int64) SearchV2Option {
+	return func(so *SearchV2Options) {
+		so.widthGt = minWidth
+		so.widthLt = maxWidth
+		so.heightGt = minHeight
+		so.heightLt = maxHeight
+	}
+}
+
+type SearchV2Options struct {
+	page          int
+	order         Order
+	contentRating ContentRating
+	mode          SearchMode
+	widthGt       int64
+	widthLt       int64
+	heightGt      int64
+	heightLt      int64
+}
+
+func newSearchV2Options(opts ...SearchV2Option) *SearchV2Options {
+	o := &SearchV2Options{page: 1}
+	for _, opt := range opts {
+		opt(o)
+	}
+	return o
+}
+
+// ContentRating defines artwork content classification
+// ContentRating 定义作品内容分级
+type ContentRating string
+
+const (
+	AllContent  ContentRating = ""     // All content types | 全部内容类型
+	SafeContent ContentRating = "safe" // Suitable for all ages | 全年龄适宜
+	R18Content  ContentRating = "r18"  // Restricted adult content | 限制级内容
+)
+
+var (
+	// Deprecated: use [AllContent] instead
+	ContentRatingAll = AllContent
+	// Deprecated: use [SafeContent] instead
+	ContentRatingSafe = SafeContent
+	// Deprecated: use [R18Content] instead
+	ContentRatingR18 = R18Content
+)
+
+// Order defines sorting criteria
+// Order 定义排序方式
+type Order string
+
+const (
+	DateDescending Order = ""     // Newest first (default) | 按时间降序（默认）
+	DateAscending  Order = "date" // Oldest first | 按时间升序
+)
+
+var (
+	// Deprecated: use [DateDescending] instead
+	OrderDateDSC = DateDescending
+	// Deprecated: use [DateAscending] instead
+	OrderDateASC = DateAscending
+)
+
+// SearchMode defines artwork search matching strategy
+// SearchMode 定义作品搜索匹配策略
+type SearchMode string
+
+const (
+	// TagSearch performs exact tag matching (default)
+	// TagSearch 执行精确标签匹配（默认模式）
+	TagSearch SearchMode = ""
+
+	// PartialTagSearch matches partial tag content
+	// PartialTagSearch 匹配标签部分内容
+	PartialTagSearch SearchMode = "s_tag"
+
+	// TitleOrCaptionSearch matches title or description
+	// TitleOrCaptionSearch 匹配标题或作品描述
+	TitleOrCaptionSearch SearchMode = "s_tc"
+)
+
+var (
+	// Deprecated: use [TagSearch] instead
+	// exact tag match (default)
+	SearchModeTag = TagSearch
+
+	// Deprecated: use [PartialTagSearch] instead
+	// partial tag match
+	SearchModePartialTag = PartialTagSearch
+
+	// Deprecated: use [TitleOrCaptionSearch] instead
+	// title or caption match
+	SearchModeTitleOrCaption = TitleOrCaptionSearch
+)
