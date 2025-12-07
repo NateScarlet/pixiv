@@ -5,6 +5,7 @@
 		}
 	],
 	"settings": {
+		"go.testEnvFile": "${workspaceRoot}/.env",
 		"cSpell.words": [
 			"gjson",
 			"pixiv",
