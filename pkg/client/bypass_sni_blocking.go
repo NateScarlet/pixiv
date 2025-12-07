@@ -39,7 +39,7 @@ func (t *BypassSNIBlockingTransport) ensureAntiSNIDetectTransport() http.RoundTr
 			if err != nil {
 				return nil, err
 			}
-			ip, err := t.c.ensureDNSResolver().Resolve(context.Background(), host)
+			ip, err := t.c.ensureDNSResolver().Resolve(ctx, host)
 			if err != nil {
 				return nil, err
 			}
