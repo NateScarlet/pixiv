@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.7.3](https://github.com/NateScarlet/pixiv/compare/v0.7.2...v0.7.3) (2025-12-07)
+
+
+### Bug Fixes
+
+* handle unexpected redirect from https to http ([ad4a7af](https://github.com/NateScarlet/pixiv/commit/ad4a7af71e1204bbc139908092d6a7f9a7e05462))
+
 ## [0.7.2](https://github.com/NateScarlet/pixiv/compare/v0.7.1...v0.7.2) (2025-04-03)
 
 
