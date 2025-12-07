@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 )
@@ -33,7 +34,7 @@ func (t *BypassSNIBlockingTransport) ensureAntiSNIDetectTransport() http.RoundTr
 
 	if t.antiSNIDetectTransport == nil {
 		var v = new(http.Transport)
-		v.DialTLS = func(network, addr string) (net.Conn, error) {
+		v.DialTLSContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
 			host, port, err := net.SplitHostPort(addr)
 			if err != nil {
 				return nil, err
@@ -93,12 +94,19 @@ var BlockedHostnames = map[string]struct{}{
 }
 
 // RoundTrip implements http.RoundTripper
-func (t *BypassSNIBlockingTransport) RoundTrip(req *http.Request) (resp *http.Response, err error) {
+func (t *BypassSNIBlockingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if _, ok := BlockedHostnames[req.URL.Host]; !ok {
 		// skip not blocked.
 		return t.ensureWrappedTransport().RoundTrip(req)
 	}
-	return t.ensureAntiSNIDetectTransport().RoundTrip(req)
+	resp, err := t.ensureAntiSNIDetectTransport().RoundTrip(req)
+	if err != nil {
+		return resp, err
+	}
+	if to := resp.Header.Get("Location"); strings.HasPrefix(to, "http:") {
+		resp.Header.Set("Location", "https:"+to[5:])
+	}
+	return resp, nil
 }
 
 // BypassSNIBlocking wrap current transport with bypass sni blocking support.
