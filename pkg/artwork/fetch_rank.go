@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/NateScarlet/pixiv/pkg/client"
+	"github.com/NateScarlet/pixiv/pkg/image"
 	"github.com/tidwall/gjson"
 )
 
@@ -271,6 +272,17 @@ func (i ItemInFetchRankPayload) Tags() iter.Seq[string] {
 
 // MaxWidth1200URL returns the large image URL (max 1200px width).
 // MaxWidth1200URL 返回最大1200px宽度的大图URL。
+//
+// The raw `url` field in the ranking JSON is a `/c/{size}/`-prefixed thumbnail,
+// so it is normalized to the master1200 URL via [image.FromURL].
+// ranking 响应的 url 字段是带 /c/{size}/ 前缀的缩略图，这里通过 [image.FromURL] 归一为 master1200 大图。
+//
+// It falls back to the raw url unchanged when the url cannot be recognized.
+// 无法识别时原样返回原始 url。
 func (i ItemInFetchRankPayload) MaxWidth1200URL() string {
-	return i.get("url").String()
+	u := i.get("url").String()
+	if urls, err := image.FromURL(u); err == nil {
+		return urls.Regular
+	}
+	return u
 }
