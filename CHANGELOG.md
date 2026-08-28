@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.7.4](https://github.com/NateScarlet/pixiv/compare/v0.7.3...v0.7.4) (2026-08-28)
+
+
+### Bug Fixes
+
+* **artwork:** fetch rank MaxWidth1200URL should return the master1200 large image ([c0fd717](https://github.com/NateScarlet/pixiv/commit/c0fd717011f2007c6f1fe3695207542ffb6471ba)), closes [#78](https://github.com/NateScarlet/pixiv/issues/78)
+
 ## [0.7.3](https://github.com/NateScarlet/pixiv/compare/v0.7.2...v0.7.3) (2025-12-07)
 
 
