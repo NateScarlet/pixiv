@@ -35,6 +35,10 @@ mode
 
     - r18g
 
+    - daily_ai
+
+    - daily_r18_ai
+
 content
 
   排行内容，不填则为综合排行，有些排行模式只对综合排行有效。

@@ -22,18 +22,20 @@ import (
 type RankMode string
 
 const (
-	DailyRank     RankMode = "daily"
-	WeeklyRank    RankMode = "weekly"
-	MonthlyRank   RankMode = "monthly"
-	RookieRank    RankMode = "rookie"
-	OriginalRank  RankMode = "original"
-	MaleRank      RankMode = "male"
-	FemaleRank    RankMode = "female"
-	DailyR18Rank  RankMode = "daily_r18"
-	WeeklyR18Rank RankMode = "weekly_r18"
-	MaleR18Rank   RankMode = "male_r18"
-	FemaleR18Rank RankMode = "female_r18"
-	R18GRank      RankMode = "r18g"
+	DailyRank      RankMode = "daily"
+	WeeklyRank     RankMode = "weekly"
+	MonthlyRank    RankMode = "monthly"
+	RookieRank     RankMode = "rookie"
+	OriginalRank   RankMode = "original"
+	MaleRank       RankMode = "male"
+	FemaleRank     RankMode = "female"
+	DailyR18Rank   RankMode = "daily_r18"
+	WeeklyR18Rank  RankMode = "weekly_r18"
+	MaleR18Rank    RankMode = "male_r18"
+	FemaleR18Rank  RankMode = "female_r18"
+	R18GRank       RankMode = "r18g"
+	DailyAIRank    RankMode = "daily_ai"
+	DailyR18AIRank RankMode = "daily_r18_ai"
 )
 
 func (t ContentType) rankInput() string {
