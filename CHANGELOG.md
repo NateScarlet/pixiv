@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.7.5](https://github.com/NateScarlet/pixiv/compare/v0.7.4...v0.7.5) (2026-08-29)
+
+
+### Features
+
+* **artwork:** add AI generated ranking modes ([c26b56b](https://github.com/NateScarlet/pixiv/commit/c26b56b5a323b0640c93cd9fa1336a02fef21106))
+
 ## [0.7.4](https://github.com/NateScarlet/pixiv/compare/v0.7.3...v0.7.4) (2026-08-28)
 
 
