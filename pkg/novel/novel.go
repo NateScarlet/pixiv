@@ -48,6 +48,7 @@ type Novel struct {
 	LikeCount     int64
 	ViewCount     int64
 	BookmarkCount int64
+	CreationMethod CreationMethod
 }
 
 // Fetch additional data from pixiv single novel api (require login),
@@ -95,7 +96,19 @@ func (i *Novel) Fetch(ctx context.Context) (err error) {
 		return true
 	})
 	i.Content = data.Get("content").String()
+	i.CreationMethod = parseCreationMethod(data.Get("aiType"))
 	return
+}
+
+func parseCreationMethod(v gjson.Result) CreationMethod {
+	switch v.Int() {
+	case 1:
+		return ManuallyCreated
+	case 2:
+		return AIGenerated
+	default: // 包括0和其他未定义值
+		return UnknownCreationMethod
+	}
 }
 
 // URL to view web page.
@@ -110,3 +123,13 @@ func (i Novel) HTMLContent(ctx context.Context, renderer ContentRenderer) (strin
 	}
 	return HTMLContent(ctx, renderer, i.Content)
 }
+
+// CreationMethod indicates the novel's creation method
+// CreationMethod 表示小说的创作方式
+type CreationMethod int
+
+const (
+	UnknownCreationMethod CreationMethod = iota // Unknown creation method | 未知创作类型
+	ManuallyCreated                             // Created without AI tools | 非AI生成作品
+	AIGenerated                                 // Created with AI technology | AI生成作品
+)

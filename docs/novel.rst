@@ -65,6 +65,12 @@ bookmarkCount
 
     收藏数
 
+aiType
+
+    类型: 0 | 1 | 2
+
+    创作类型， 0: 未知 1: 非AI生成 2: AI生成。
+
 [textEmbeddedImages]: null | Record<string, object>
 
     随小说上传的图片
