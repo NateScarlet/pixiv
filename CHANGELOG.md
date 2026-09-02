@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.7.6](https://github.com/NateScarlet/pixiv/compare/v0.7.5...v0.7.6) (2026-09-02)
+
+
+### Features
+
+* **novel:** add CreationMethod field for AI generation detection ([0a5362a](https://github.com/NateScarlet/pixiv/commit/0a5362ac5f64724d72a6ddf302228e7848729cc2))
+
 ## [0.7.5](https://github.com/NateScarlet/pixiv/compare/v0.7.4...v0.7.5) (2026-08-29)
 
 
