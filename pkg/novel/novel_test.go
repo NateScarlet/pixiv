@@ -2,10 +2,14 @@ package novel
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/NateScarlet/pixiv/pkg/client"
 	"github.com/NateScarlet/snapshot/pkg/snapshot"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -62,4 +66,22 @@ func TestFetchNovelWithEmbeddedImages(t *testing.T) {
 	err := i.Fetch(ctx)
 	require.NoError(t, err)
 	snapshotNovel(t, i)
+}
+
+func TestFetchNovelNullEmbeddedImages(t *testing.T) {
+	// 模拟 /ajax/novel/{id} 返回 textEmbeddedImages 为 null 的响应。
+	// 该场景对应无嵌入图的小说（如 29047862）。
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `{"body":{"title":"","description":"","coverUrl":"","content":"","createDate":"","uploadDate":"","userId":"","userName":"","pageCount":0,"commentCount":0,"likeCount":0,"viewCount":0,"bookmarkCount":0,"tags":{"tags":[]},"textEmbeddedImages":null,"aiType":0}}`)
+	}))
+	defer server.Close()
+
+	c := new(client.Client)
+	c.ServerURL = server.URL
+	ctx := client.With(context.Background(), c)
+
+	i := Novel{ID: "29047862"}
+	err := i.Fetch(ctx)
+	require.NoError(t, err)
+	assert.Nil(t, i.EmbeddedImages)
 }

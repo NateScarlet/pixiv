@@ -83,18 +83,23 @@ func (i *Novel) Fetch(ctx context.Context) (err error) {
 		tags = append(tags, i.String())
 	}
 	i.Tags = tags
-	data.Get("textEmbeddedImages").ForEach(func(key, value gjson.Result) bool {
-		if i.EmbeddedImages == nil {
-			i.EmbeddedImages = make(map[string]image.URLs)
-		}
-		i.EmbeddedImages[key.String()] = image.URLs{
-			Thumb:    value.Get("urls.128x128").String(),
-			Small:    value.Get("urls.480mw").String(),
-			Regular:  value.Get("urls.1200x1200").String(),
-			Original: value.Get("urls.original").String(),
-		}
-		return true
-	})
+	// textEmbeddedImages 为 null 时 ForEach 仍会回调一次，产生空 key 的空条目。
+	// 因此仅在字段为对象时遍历。
+	embeddedImages := data.Get("textEmbeddedImages")
+	if embeddedImages.IsObject() {
+		embeddedImages.ForEach(func(key, value gjson.Result) bool {
+			if i.EmbeddedImages == nil {
+				i.EmbeddedImages = make(map[string]image.URLs)
+			}
+			i.EmbeddedImages[key.String()] = image.URLs{
+				Thumb:    value.Get("urls.128x128").String(),
+				Small:    value.Get("urls.480mw").String(),
+				Regular:  value.Get("urls.1200x1200").String(),
+				Original: value.Get("urls.original").String(),
+			}
+			return true
+		})
+	}
 	i.Content = data.Get("content").String()
 	i.CreationMethod = parseCreationMethod(data.Get("aiType"))
 	return
