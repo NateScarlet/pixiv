@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.7.7](https://github.com/NateScarlet/pixiv/compare/v0.7.6...v0.7.7) (2026-09-04)
+
+
+### Bug Fixes
+
+* **novel:** should not create empty EmbeddedImages entry when textEmbeddedImages is null ([ac1f6b0](https://github.com/NateScarlet/pixiv/commit/ac1f6b0c6dfe7fd799a5fc2ab21cc32e0914cc08)), closes [#82](https://github.com/NateScarlet/pixiv/issues/82)
+
 ## [0.7.6](https://github.com/NateScarlet/pixiv/compare/v0.7.5...v0.7.6) (2026-09-02)
 
 
