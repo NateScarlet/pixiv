@@ -10,6 +10,7 @@ import (
 	"github.com/tidwall/gjson"
 )
 
+// Deprecated: use [SearchV2] instead.
 // SearchResult holds search data and provide useful methods.
 type SearchResult struct {
 	JSON gjson.Result
@@ -21,6 +22,7 @@ func (r SearchResult) ForEach(iterator func(key, value gjson.Result) bool) {
 
 }
 
+// Deprecated: use [SearchV2] instead.
 // Novels appeared in the search result.
 func (r SearchResult) Novels() []Novel {
 	ret := make([]Novel, 0, int(r.JSON.Get("#").Int()))
@@ -54,14 +56,17 @@ func (r SearchResult) Novels() []Novel {
 
 }
 
+// Deprecated: use [SearchV2Options] instead.
 // SearchOptions for Search
 type SearchOptions struct {
 	Page int
 }
 
+// Deprecated: use [SearchV2Option] instead.
 // SearchOption mutate SearchOptions
 type SearchOption func(*SearchOptions)
 
+// Deprecated: use [SearchV2WithPage] instead.
 // SearchOptionPage change page to retrieve
 func SearchOptionPage(page int) SearchOption {
 	return func(so *SearchOptions) {
@@ -69,6 +74,7 @@ func SearchOptionPage(page int) SearchOption {
 	}
 }
 
+// Deprecated: use [SearchV2] instead.
 // Search calls pixiv novel search api.
 func Search(ctx context.Context, query string, opts ...SearchOption) (result SearchResult, err error) {
 	var args = new(SearchOptions)

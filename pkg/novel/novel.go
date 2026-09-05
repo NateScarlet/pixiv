@@ -28,6 +28,7 @@ func (i Series) URL() *url.URL {
 	return i.URLWithClient(*client.Default)
 }
 
+// Deprecated: use [Fetch] instead.
 // Novel data
 type Novel struct {
 	ID             string
@@ -51,6 +52,7 @@ type Novel struct {
 	CreationMethod CreationMethod
 }
 
+// Deprecated: use [Fetch] instead.
 // Fetch additional data from pixiv single novel api (require login),
 func (i *Novel) Fetch(ctx context.Context) (err error) {
 	if i.ID == "" {
