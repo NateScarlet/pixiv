@@ -10,6 +10,7 @@ Pixiv go 客户端， 使用 PIXIV 网页 API。
 - [x] 画作搜索
 - [x] 画作排行榜
 - [x] 画作详情
+- [x] 系列数据 (画作/小说详情)
 - [x] 小说搜索
 - [ ] 小说排行榜
 - [x] 小说详情
@@ -19,6 +20,8 @@ Pixiv go 客户端， 使用 PIXIV 网页 API。
 详细使用方法以代码注释为准
 
 2024-08-27: 账号密码登录方式已失效，手动登录获取 PHPSESSID 代替
+
+novel 包旧版建模 API（`Search`/`SearchResult`/`Novel.Fetch`）已标记为 Deprecated，请改用 `SearchV2`/`Fetch`（不可变记录）。
 
 ```go
 package main
@@ -83,6 +86,9 @@ for tag := range art.Tags() {
     fmt.Println("标签:", tag)
 }
 fmt.Println("查看网页版:", art.URL().String())
+if series := art.Series(); !series.IsZero() {
+    fmt.Println("所属系列:", series.Title(), "第", series.Order(), "话")
+}
 
 // 获取画作全部分页
 pages, _ := artwork.FetchPages(ctx, "22238487")
@@ -90,15 +96,19 @@ for page := range pages.Pages() {
     fmt.Println("原图地址:", page.OriginalURL())
 }
 
-// 搜索小说
-result, err := novel.Search(ctx, "パチュリー・ノーレッジ")
-result.JSON // json return data.
-result.Novels() // []novel.Novel，只有部分数据，通过 `Fetch` 方法获取完整数据。
-novel.Search(ctx, "パチュリー・ノーレッジ", novel.SearchOptionPage(2)) // 获取第二页
+// 搜索小说 (不可变记录, 已知字段方法 + Raw() 获取未建模字段)
+payload, _ := novel.SearchV2(ctx, "パチュリー・ノーレッジ")
+for item := range payload.Items() {
+    fmt.Println(item.Title(), "by", item.AuthorName())
+}
 
-// 小说详情
-i := &novel.Novel{ID: "11983096"}
-err := i.Fetch(ctx) // 获取小说详情, 直接更新 struct 数据。
+// 小说详情 (不可变记录)
+data, _ := novel.Fetch(ctx, "11983096")
+fmt.Println("标题:", data.Title())
+series := data.Series()
+if !series.IsZero() {
+    fmt.Println("所属系列:", series.Title(), "第", series.Order(), "话")
+}
 
 // 用户详情
 i := &user.User{ID: "789096"}
