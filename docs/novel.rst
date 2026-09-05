@@ -71,6 +71,60 @@ aiType
 
     创作类型， 0: 未知 1: 非AI生成 2: AI生成。
 
+[seriesNavData]: null | object
+
+    小说所属系列数据， 小说不属于任何系列时该字段缺失。
+
+seriesNavData.seriesId
+
+    类型: number
+
+    系列 ID
+
+seriesNavData.title
+
+    类型: string
+
+    系列标题
+
+seriesNavData.order
+
+    类型: number
+
+    小说在系列中的次序， 从 1 开始
+
+[seriesNavData.prev]: null | object
+
+    系列中紧邻的上一章节， 无上一章节时为 null。
+
+seriesNavData.prev.id
+
+    类型: string
+
+    上一章节的小说 ID
+
+seriesNavData.prev.title
+
+    类型: string
+
+    上一章节标题
+
+seriesNavData.prev.order
+
+    类型: number
+
+    上一章节在系列中的次序
+
+seriesNavData.prev.available
+
+    类型: boolean
+
+    上一章节是否可访问
+
+[seriesNavData.next]: null | object
+
+    系列中紧邻的下一章节， 字段同 prev。
+
 [textEmbeddedImages]: null | Record<string, object>
 
     随小说上传的图片
