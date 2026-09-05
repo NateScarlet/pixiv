@@ -85,3 +85,46 @@ func TestFetchNovelNullEmbeddedImages(t *testing.T) {
 	require.NoError(t, err)
 	assert.Nil(t, i.EmbeddedImages)
 }
+
+// seriesNavData 含系列信息的小说详情响应(mock),基于 issue #84 的样本(novel 28612019)。
+const fetchNovelWithSeriesResponse = `{"body":{"title":"もし、ボーイズバーで働くとして","seriesNavData":{"seriesType":"novel","seriesId":16040720,"title":"もし、ボーイズバーで働くとして","order":11,"prev":{"title":"第９話","order":10,"id":"28556784","available":true},"next":null},"aiType":1}}`
+
+func fetchNovelFromMock(t *testing.T, body string) Novel {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, body)
+	}))
+	t.Cleanup(server.Close)
+
+	c := new(client.Client)
+	c.ServerURL = server.URL
+	ctx := client.With(context.Background(), c)
+
+	i := Novel{ID: "28612019"}
+	err := i.Fetch(ctx)
+	require.NoError(t, err)
+	return i
+}
+
+func TestFetchNovelFillsSeriesFromSeriesNavData(t *testing.T) {
+	i := fetchNovelFromMock(t, fetchNovelWithSeriesResponse)
+	assert.Equal(t, "16040720", i.Series.ID)
+	assert.Equal(t, "もし、ボーイズバーで働くとして", i.Series.Title)
+}
+
+func TestFetchNovelWithoutSeriesNavDataKeepsZeroSeries(t *testing.T) {
+	i := fetchNovelFromMock(t, `{"body":{"title":"no series"}}`)
+	assert.Equal(t, Series{}, i.Series)
+}
+
+// TestFetchNovelSeriesLive 验证真实匿名接口解析 seriesNavData(issue #84 样本: 28612019)。
+// 匿名接口无需登录;需要网络可用并配合代理访问 pixiv。
+func TestFetchNovelSeriesLive(t *testing.T) {
+	if os.Getenv("PIXIV_LIVE") == "" {
+		t.Skip("set PIXIV_LIVE=1 to run live tests")
+	}
+	i := Novel{ID: "28612019"}
+	err := i.Fetch(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "16040720", i.Series.ID)
+	assert.Equal(t, "もし、ボーイズバーで働くとして", i.Series.Title)
+}

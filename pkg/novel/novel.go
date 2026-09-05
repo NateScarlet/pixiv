@@ -101,6 +101,14 @@ func (i *Novel) Fetch(ctx context.Context) (err error) {
 		})
 	}
 	i.Content = data.Get("content").String()
+	// seriesNavData 字段缺失表示小说不属于任何系列,Series 保持零值。
+	seriesNavData := data.Get("seriesNavData")
+	if seriesNavData.IsObject() {
+		i.Series = Series{
+			ID:    seriesNavData.Get("seriesId").String(),
+			Title: seriesNavData.Get("title").String(),
+		}
+	}
 	i.CreationMethod = parseCreationMethod(data.Get("aiType"))
 	return
 }
