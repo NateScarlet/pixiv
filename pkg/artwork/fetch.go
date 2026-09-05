@@ -233,3 +233,103 @@ func (p FetchPayload) CreationMethod() CreationMethod {
 		return UnknownCreationMethod
 	}
 }
+
+// Series returns the series the artwork belongs to,
+// zero value (IsZero) when the artwork is not in any series.
+// Series 返回作品所属的系列信息;作品不属于任何系列时返回零值记录。
+func (p FetchPayload) Series() FetchPayloadSeries {
+	return FetchPayloadSeries{raw: json.RawMessage(p.get("seriesNavData").Raw)}
+}
+
+// FetchPayloadSeries is the position of the artwork inside its series,
+// parsed from seriesNavData.
+// FetchPayloadSeries 表示作品在所属系列中的位置,由 seriesNavData 解析。
+type FetchPayloadSeries struct {
+	raw json.RawMessage
+}
+
+func (s FetchPayloadSeries) get(path string) gjson.Result {
+	return gjson.GetBytes(s.raw, path)
+}
+
+// ID returns the series id.
+// ID 返回系列 ID。
+func (s FetchPayloadSeries) ID() string {
+	return s.get("seriesId").String()
+}
+
+// Title returns the series title.
+// Title 返回系列标题。
+func (s FetchPayloadSeries) Title() string {
+	return s.get("title").String()
+}
+
+// Order returns the position of the artwork in the series (1-based).
+// Order 返回作品在系列中的次序(从 1 开始)。
+func (s FetchPayloadSeries) Order() int64 {
+	return s.get("order").Int()
+}
+
+// Prev returns the previous chapter in the series, zero value when absent.
+// Prev 返回系列中紧邻的上一章节;无上一章节时为零值记录。
+func (s FetchPayloadSeries) Prev() SeriesNeighbor {
+	return SeriesNeighbor{raw: json.RawMessage(s.get("prev").Raw)}
+}
+
+// Next returns the next chapter in the series, zero value when absent.
+// Next 返回系列中紧邻的下一章节;无下一章节时为零值记录。
+func (s FetchPayloadSeries) Next() SeriesNeighbor {
+	return SeriesNeighbor{raw: json.RawMessage(s.get("next").Raw)}
+}
+
+// Raw returns the raw seriesNavData JSON.
+// Raw 返回 seriesNavData 的原始 JSON。
+func (s FetchPayloadSeries) Raw() json.RawMessage {
+	return s.raw
+}
+
+// IsZero reports whether the artwork is not in any series.
+// IsZero 报告作品是否不属于任何系列。
+func (s FetchPayloadSeries) IsZero() bool {
+	return s.ID() == ""
+}
+
+// SeriesNeighbor is an adjacent chapter of the series.
+// SeriesNeighbor 表示系列中相邻的一个章节。
+type SeriesNeighbor struct {
+	raw json.RawMessage
+}
+
+func (n SeriesNeighbor) get(path string) gjson.Result {
+	return gjson.GetBytes(n.raw, path)
+}
+
+// ID returns the adjacent chapter's artwork id.
+// ID 返回相邻章节的作品 ID。
+func (n SeriesNeighbor) ID() string {
+	return n.get("id").String()
+}
+
+// Title returns the adjacent chapter's title.
+// Title 返回相邻章节的标题。
+func (n SeriesNeighbor) Title() string {
+	return n.get("title").String()
+}
+
+// Order returns the position of the adjacent chapter in the series.
+// Order 返回相邻章节在系列中的次序。
+func (n SeriesNeighbor) Order() int64 {
+	return n.get("order").Int()
+}
+
+// Available reports whether the adjacent chapter is accessible.
+// Available 报告相邻章节是否可访问。
+func (n SeriesNeighbor) Available() bool {
+	return n.get("available").Bool()
+}
+
+// Raw returns the raw prev/next JSON.
+// Raw 返回相邻章节的原始 JSON。
+func (n SeriesNeighbor) Raw() json.RawMessage {
+	return n.raw
+}
