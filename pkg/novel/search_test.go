@@ -2,8 +2,12 @@ package novel
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
+	"github.com/NateScarlet/pixiv/pkg/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
@@ -30,4 +34,22 @@ func TestSearchNovel(t *testing.T) {
 		assert.NotEmpty(t, i.Author.ID)
 	}
 
+}
+
+func TestSearchResultNovelsFillsDescription(t *testing.T) {
+	// 回归测试:搜索条目描述字段名为小写 description(旧代码曾误用大写 Description)。
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `{"body":{"novel":{"data":[{"id":"1","title":"t","description":"desc","userId":"2","userName":"a","textCount":10,"bookmarkCount":1,"tags":["tag"],"seriesId":"3","seriesTitle":"s"}]}}}`)
+	}))
+	defer server.Close()
+
+	c := new(client.Client)
+	c.ServerURL = server.URL
+	ctx := client.With(context.Background(), c)
+
+	result, err := Search(ctx, "検索語")
+	require.NoError(t, err)
+	novels := result.Novels()
+	require.Len(t, novels, 1)
+	assert.Equal(t, "desc", novels[0].Description)
 }

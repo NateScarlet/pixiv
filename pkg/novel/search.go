@@ -28,7 +28,7 @@ func (r SearchResult) Novels() []Novel {
 		n := Novel{
 			ID:          value.Get("id").String(),
 			Title:       value.Get("title").String(),
-			Description: value.Get("Description").String(),
+			Description: value.Get("description").String(),
 			Author: user.User{
 				ID:   value.Get("userId").String(),
 				Name: value.Get("userName").String(),
