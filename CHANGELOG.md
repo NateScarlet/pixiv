@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.7.8](https://github.com/NateScarlet/pixiv/compare/v0.7.7...v0.7.8) (2026-09-06)
+
+
+### Features
+
+* **artwork:** add Series accessor to FetchPayload ([2f71950](https://github.com/NateScarlet/pixiv/commit/2f71950612f45008a208ec11bfcd1bda9d43a9a0))
+* **novel:** add raw-based immutable Fetch payload ([6d4693f](https://github.com/NateScarlet/pixiv/commit/6d4693f3b461dd61b0be46078a8de35ba4747a9f))
+* **novel:** add raw-based immutable SearchV2 payload ([1357913](https://github.com/NateScarlet/pixiv/commit/13579135cd9b54a046acec5ea5f75f48ee55c144))
+* **novel:** deprecate legacy modeled APIs in favor of raw-based payloads ([b1b59e9](https://github.com/NateScarlet/pixiv/commit/b1b59e9ee6b2ee5d4e13eae720b59fae8e6affa0))
+
+
+### Bug Fixes
+
+* **novel:** should fill Description from lowercase description field in search ([832b9bf](https://github.com/NateScarlet/pixiv/commit/832b9bfd856d9b0fbbccc2c8aee149999ca28f4e))
+* **novel:** should fill Series from seriesNavData in Fetch ([f6a5543](https://github.com/NateScarlet/pixiv/commit/f6a554320948d874e7fb78b04d7f1331fa289c41))
+
 ## [0.7.7](https://github.com/NateScarlet/pixiv/compare/v0.7.6...v0.7.7) (2026-09-04)
 
 
