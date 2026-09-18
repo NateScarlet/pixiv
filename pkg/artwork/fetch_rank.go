@@ -71,7 +71,7 @@ func FetchRank(ctx context.Context, mode RankMode, options ...FetchRankOption) (
 	if opts.content != UnknownContentType {
 		var s = opts.content.rankInput()
 		if s == "" {
-			err = fmt.Errorf("unsupported content type %q", opts.content)
+			err = fmt.Errorf("unsupported content type %d", opts.content)
 			return
 		}
 		q.Set("content", s)

@@ -1,6 +1,6 @@
 module github.com/NateScarlet/pixiv
 
-go 1.23
+go 1.26
 
 require (
 	github.com/NateScarlet/snapshot v0.6.0
