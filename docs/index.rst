@@ -6,6 +6,7 @@ Pixiv go 客户端
   :caption: 内容:
 
   auth
+  direct-connection
   artwork
   artwork_search
   artwork_rank
