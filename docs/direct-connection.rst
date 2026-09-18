@@ -109,10 +109,42 @@ ECH 把 ClientHello 拆成内外两层：外层使用公共的 ``cloudflare-ech.
 有两种途径：
 
 1. **DoH 查询 HTTPS 记录（type 65）**，从记录中取出 ``ech=`` 参数。
-   注意并非所有 DoH 服务都支持查询 type 65。
 2. **TLS 握手**：发送一份故意的无效 ECH 配置，服务端无法解密时会在
    HelloRetryRequest 中下发正确的 ``retry_configs``。该途径不需要 DNS，
    也不需要预先持有任何配置。
+
+DoH 端点的支持情况
+++++++++++++++++++++++++++
+
+并非所有 DoH 服务都支持查询 type 65，且**不支持时会返回空结果而非报错**，
+容易与「该域名确实没有 ECH 配置」混淆。实测各主要服务的支持情况：
+
+.. list-table::
+  :header-rows: 1
+
+  * - 支持 type 65
+    - 不支持
+  * - ``dns.google``
+    - ``doh.pub``、``dns.alidns.com``
+  * - ``1.1.1.1``
+    - Quad9、AdGuard、NextDNS、Mullvad、DNS.SB、OpenDNS、ControlD
+
+因此查询 type 65 时必须选用上表左列的端点。用支持 type 65 的端点
+交叉验证 ``www.pixiv.net``、``pixiv.net``、``i.pximg.net``，
+结果一致为「无 HTTPS 记录」。
+
+构造 ECHConfigList 的要点
+++++++++++++++++++++++++++
+
+自行构造配置（例如用于自举或本地测试）时，以下几点写错会导致失败，
+且部分错误在**本地就被拒绝**、请求根本发不出去：
+
+- ``cipher_suites`` 每项是 4 字节的 ``(kdf_id, aead_id)`` 对。
+  长度或取值不符时报 ``invalid cipher_suites aead_id field``。
+- ``extensions`` 字段必须存在（可为空）。缺失时报 ``invalid extensions field``。
+- 公钥必须是**合法的 X25519 点**。使用全零等非法值会在本地报
+  ``crypto/ecdh: bad X25519 point``；若目的是让服务端无法解密，
+  应使用一个合法但服务端并不持有对应私钥的公钥。
 
 轮换
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -125,6 +157,31 @@ ECHConfig 会轮换。观测到的情况：
   同一客户端可能连续拿到其中任意一份。
 
 因此不应把某一份 ECHConfig 视为长期有效。
+
+社区实现的做法
+++++++++++++++++++++++++++
+
+可供参考的其他客户端做法：
+
+- **PixEz**（Flutter）在 ECH 模式下启用 ``enableEch`` 与 ``requireEch``，
+  并对图片主机单独使用不发送 SNI 的方式（``sni: false``），
+  与本页「主机分两类」的结论一致。
+- **pixiv-api-http**（Node）早期采用硬编码 IP 加不发送 SNI 的做法，
+  其配置中的地址段现已全部不可达——硬编码 IP 会随 pixiv 调整而失效。
+- **Total-ECH**（Cloudflare Workers）通过修改 DoH 返回的 HTTPS 记录，
+  为解析到 CDN 的域名注入 ECH 配置，并自行处理轮换。
+
+测试的可行性
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+ECH 可在**完全不依赖外部网络**的条件下测试：Go 的服务端与客户端均支持 ECH，
+本地起一个启用了 ECH 的服务端即可完成真实握手，并可通过连接状态中的
+``ECHAccepted`` 确认 ECH 被真正接受而非静默回退。
+
+版本要求：
+
+- 客户端 ECH（``Config.EncryptedClientHelloConfigList``）自 Go 1.23 起提供；
+- 服务端 ECH（``Config.EncryptedClientHelloKeys``）自 Go 1.24 起提供。
 
 自愈
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
