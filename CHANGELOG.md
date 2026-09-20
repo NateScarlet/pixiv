@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.8.0](https://github.com/NateScarlet/pixiv/compare/v0.7.8...v0.8.0) (2026-09-20)
+
+
+### ⚠ BREAKING CHANGES
+
+* build client with options and composable transport primitives
+
+### Features
+
+* build client with options and composable transport primitives ([6070800](https://github.com/NateScarlet/pixiv/commit/6070800002593a4f44f4fbd2845a91c3f07a43a8)), closes [#90](https://github.com/NateScarlet/pixiv/issues/90)
+* **client:** add composable ECH transport primitive ([fb9fab5](https://github.com/NateScarlet/pixiv/commit/fb9fab5207a6853d1fc643a65a69a4a35f92d57f)), closes [#88](https://github.com/NateScarlet/pixiv/issues/88)
+* **client:** add FetchImage to retrieve image content ([c827b58](https://github.com/NateScarlet/pixiv/commit/c827b581851e101f8adeef0645149e423cb3322a)), closes [#91](https://github.com/NateScarlet/pixiv/issues/91)
+
 ## [0.7.8](https://github.com/NateScarlet/pixiv/compare/v0.7.7...v0.7.8) (2026-09-06)
 
 
