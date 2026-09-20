@@ -150,9 +150,15 @@ SNI 阻断机制
 它不使用 ``DialTLSContext``：标准库文档明确后者只对 non-proxied 请求生效，
 存在代理时被静默忽略。
 
-``NewRoutedTransport`` 持有「哪些主机该用哪种方式」的清单，目前只有
-``i.pximg.net`` 走不发送 SNI 的方式；``AutoTransport`` 在此之上做自动选择，
-``DefaultTransport`` 默认为它。
+``NewRoutedTransport`` 持有「哪些主机该用哪种方式」的清单，目前有两类：
+``i.pximg.net`` 走不发送 SNI 的方式；``www.pixiv.net`` 与 ``app-api.pixiv.net``
+托管在 Cloudflare，走 ECH 直连。``AutoTransport`` 在此之上做自动选择，
+对这两类主机都会在首选方式失败时回落到常规连接，``DefaultTransport`` 默认为它。
+
+因此默认配置下，对托管在 Cloudflare 的 API 主机是**经 ECH 直连**的，
+不需要调用者额外配置。若该途径在当前网络下不可用（例如中间设备对外层名
+区别对待），请求会回落到常规连接；此时若系统解析返回被污染的地址，连接仍会
+失败，需要配合 ``WithDNSResolver`` 指定可用的 DoH 端点。
 
 实测表明第 2 步已被服务端拒绝：连接到源站、不发送 SNI 时，TLS 握手可以完成、
 证书校验也通过（证书为 ``*.pixiv.net``），但 HTTP 层返回 nginx 的 ``403 Forbidden``。

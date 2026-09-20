@@ -111,6 +111,132 @@ func TestRoutedTransportKeepsHTTPSRedirect(t *testing.T) {
 	assert.Equal(t, "https://special.example.com/next", resp.Header.Get("Location"))
 }
 
+// TestNewRoutedTransportAppliesECHToCloudflareHost 断言路由到清单内主机的传输
+// 确实施加 ECH，且该能力在真实握手下生效。
+//
+// 分两步：结构上断言清单内的主机被路由到 ECH 传输；行为上用一个与清单等价的
+// 注入路由，把请求指向本地 ECH 服务端，断言 ECH 被真正接受。
+func TestNewRoutedTransportAppliesECHToCloudflareHost(t *testing.T) {
+	// 结构与库持有的真实清单一致：清单内的主机各有专门的传输。
+	rt := NewRoutedTransport(defaultBaseTransport())
+	rs, ok := rt.(*routedTransport)
+	require.True(t, ok)
+	for host := range echHostnames {
+		route, routed := rs.routes[host]
+		require.True(t, routed, "主机 %s 应有专门的传输", host)
+		_, isECH := route.(*echTransport)
+		assert.True(t, isECH, "主机 %s 应被路由到 ECH 传输", host)
+	}
+
+	// 行为：同样的路由方式下 ECH 真正生效。
+	server := newECHTestServer(t, true)
+	base := server.transport()
+	var seen echObserved
+	observing(base, &seen)
+	injected := newRoutedTransportWithRoutes(base, map[string]http.RoundTripper{
+		// 注入路由用测试服务端发布的外层名，使外层 SNI 断言可与服务端观测对上。
+		echTestRealHost: NewECHTransport(base, WithECHPublicName(echTestPublicName)),
+	})
+
+	resp, err := (&http.Client{Transport: injected}).Get("https://" + echTestRealHost + "/")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.True(t, seen.accepted, "经路由的请求应真正建立 ECH 连接")
+	assert.Equal(t, echTestPublicName, server.seenOuterSNI()[0],
+		"服务端在解密前应只看到外层名")
+}
+
+// TestNewRoutedTransportSkipsECHForInapplicableHosts 断言不适用 ECH 的主机不被
+// 施加 ECH：它们不在 Cloudflare 之后。
+func TestNewRoutedTransportSkipsECHForInapplicableHosts(t *testing.T) {
+	rt := NewRoutedTransport(defaultBaseTransport())
+	rs, ok := rt.(*routedTransport)
+	require.True(t, ok)
+
+	for _, host := range []string{"i.pximg.net", "example.com"} {
+		if route, routed := rs.routes[host]; routed {
+			_, isECH := route.(*echTransport)
+			assert.False(t, isECH, "主机 %s 不在 Cloudflare 之后，不应被施加 ECH", host)
+		}
+	}
+}
+
+// TestRoutedTransportRoutesECHHostsToECHTransport 断言清单内的主机确实被路由到
+// 带 ECH 的传输，而不是常规传输。
+func TestRoutedTransportRoutesECHHostsToECHTransport(t *testing.T) {
+	base := defaultBaseTransport()
+	rt := newRoutedTransport(base)
+
+	for host := range echHostnames {
+		route, ok := rt.routes[host]
+		require.True(t, ok, "主机 %s 应有专门的传输", host)
+		_, isECH := route.(*echTransport)
+		assert.True(t, isECH, "主机 %s 应被路由到 ECH 传输，实际 %T", host, route)
+	}
+	// 不适用 ECH 的主机仍走不发送 SNI 的方式。
+	_, ok := rt.routes["i.pximg.net"]
+	assert.True(t, ok, "i.pximg.net 应保留不发送 SNI 的方式")
+}
+
+// TestHasRoutedWay 断言只有确有特殊方式的主机才需要回落重试。
+func TestHasRoutedWay(t *testing.T) {
+	for host, want := range map[string]bool{
+		"www.pixiv.net":     true,
+		"app-api.pixiv.net": true,
+		"i.pximg.net":       true,
+		"example.com":       false,
+		"":                  false,
+	} {
+		assert.Equal(t, want, hasRoutedWay(host), "主机 %q", host)
+	}
+}
+
+// TestAutoTransportFallsBackForECHHost 断言 ECH 不可用时自动选择仍能让请求成功：
+// ECH 只在部分主机与网络环境下可用，失败后应回落常规连接。
+func TestAutoTransportFallsBackForECHHost(t *testing.T) {
+	var baseCalls int32
+	base := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		atomic.AddInt32(&baseCalls, 1)
+		return okResponse(req), nil
+	})
+	rt := &AutoTransport{Base: base}
+	// 让 ECH 方式必然失败，观察最终结果。
+	rt.once.Do(func() {
+		rt.base = base
+		rt.routed = newRoutedTransportWithRoutes(base, map[string]http.RoundTripper{
+			"www.pixiv.net": roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+				return nil, errors.New("stub: ECH 不可用")
+			}),
+		})
+	})
+
+	req, err := http.NewRequest(http.MethodGet, "https://www.pixiv.net/", nil)
+	require.NoError(t, err)
+	resp, err := rt.RoundTrip(req)
+	require.NoError(t, err, "ECH 不可用时应回落到常规连接")
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, int32(1), atomic.LoadInt32(&baseCalls))
+}
+
+// TestAutoTransportSkipsRetryForPlainHost 断言没有特殊方式的主机不触发回落重试。
+func TestAutoTransportSkipsRetryForPlainHost(t *testing.T) {
+	var baseCalls int32
+	base := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		atomic.AddInt32(&baseCalls, 1)
+		return okResponse(req), nil
+	})
+	rt := &AutoTransport{Base: base}
+	req, err := http.NewRequest(http.MethodGet, "https://example.com/", nil)
+	require.NoError(t, err)
+	resp, err := rt.RoundTrip(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, int32(1), atomic.LoadInt32(&baseCalls), "无特殊方式的主机不应重试")
+}
+
 // TestNewRoutedTransportWithPlainRoundTripper 断言基础传输不是 *http.Transport
 // 时公开入口仍可用，请求照常发出。
 func TestNewRoutedTransportWithPlainRoundTripper(t *testing.T) {

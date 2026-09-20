@@ -49,7 +49,7 @@ func (t *AutoTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err == nil || (req.Body != nil && req.GetBody == nil) {
 		return resp, err
 	}
-	if _, ok := noSNIHostnames[req.URL.Hostname()]; !ok {
+	if !hasRoutedWay(req.URL.Hostname()) {
 		// 该主机没有特殊方式，路由传输用的就是 base，重试没有意义。
 		return resp, err
 	}
@@ -66,12 +66,23 @@ func (t *AutoTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		retryReq.Body = body
 		req = retryReq
 	}
+	// 特殊方式不可用时回落到常规连接：ECH 不适用于所有主机与网络环境
+	// （例如目标不在 Cloudflare 之后），此时仍有常规途径可用。
 	resp, err = t.base.RoundTrip(req)
 	if err == nil {
 		return resp, nil
 	}
 	// 全部方式失败：聚合各方式的错误，调用者能看到每种方式的失败原因。
 	return resp, errors.Join(routedErr, err)
+}
+
+// hasRoutedWay 报告该主机是否配有针对性的特殊连接方式。
+func hasRoutedWay(host string) bool {
+	if _, ok := noSNIHostnames[host]; ok {
+		return true
+	}
+	_, ok := echHostnames[host]
+	return ok
 }
 
 // noSNIHostnames 列出需要不发送 SNI 才能取回内容的主机。
@@ -81,6 +92,21 @@ func (t *AutoTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 var noSNIHostnames = map[string]struct{}{
 	// Pixiv 自有源站，接受不携带 SNI 的握手，配合 Referer 即可取图。
 	"i.pximg.net": {},
+}
+
+// echHostnames 列出托管在 Cloudflare、可经 ECH 直连的主机。
+//
+// 与 noSNIHostnames 一样属于库掌握的 pixiv 主机布局知识，不对外暴露为选项。
+//
+// 这些主机按 SNI 封锁，且服务端已不接受 SNI 与 Host 不匹配的请求
+// （见 docs/direct-connection.rst）。ECH 把真实域名加密在内层，
+// 中间设备只能看到外层名，因此直连可用。
+//
+// 只列出确实托管在 Cloudflare 的主机：ECH 只对这类主机适用，对不在
+// Cloudflare 之后的主机（如 i.pximg.net）其证书与 ECH 外层名不匹配。
+var echHostnames = map[string]struct{}{
+	"www.pixiv.net":     {},
+	"app-api.pixiv.net": {},
 }
 
 // NewRoutedTransport 按请求主机把请求交给适合该主机的传输。
@@ -106,11 +132,16 @@ func newRoutedTransport(base http.RoundTripper) *routedTransport {
 	}
 	var ret = &routedTransport{
 		base:   base,
-		routes: make(map[string]http.RoundTripper, len(noSNIHostnames)),
+		routes: make(map[string]http.RoundTripper, len(noSNIHostnames)+len(echHostnames)),
 	}
 	if b, ok := base.(*http.Transport); ok {
 		for host := range noSNIHostnames {
 			ret.routes[host] = newNoSNITransport(b, host)
+		}
+		// 每个 ECH 主机一份传输：ECH 配置是每 Transport 一份的字段，
+		// 且各主机的自举与轮换互相独立。
+		for host := range echHostnames {
+			ret.routes[host] = NewECHTransport(b)
 		}
 	}
 	return ret
