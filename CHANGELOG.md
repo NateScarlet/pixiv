@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.8.1](https://github.com/NateScarlet/pixiv/compare/v0.8.0...v0.8.1) (2026-09-20)
+
+
+### Features
+
+* **client:** use ECH for Cloudflare-hosted hosts in auto transport ([4315534](https://github.com/NateScarlet/pixiv/commit/43155343e096e7191e0d9ac0b958072466fcb825))
+
 ## [0.8.0](https://github.com/NateScarlet/pixiv/compare/v0.7.8...v0.8.0) (2026-09-20)
 
 
