@@ -1,0 +1,29 @@
+# 依赖真实 pixiv 的测试，与离线测试分开成独立工作流。
+#
+# 这些测试断言的是外部服务当下的行为，失败可能源于 pixiv 改版或网络侧封锁变化
+# 而非本仓库的改动；独立成文件可让它的失败不染红 Go 工作流的构建状态。
+name: Go (live)
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 16 * * *"
+jobs:
+  live:
+    name: Live
+    runs-on: ubuntu-latest
+    steps:
+      # 版本取自 go.mod，避免升级 Go 时出现两份需要同步的版本号。
+      - name: Check out code into the Go module directory
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      # PIXIV_LIVE 解除 testenv.RequireLive 的跳过，使真实网络测试真正执行。
+      # 未置该变量时这些测试自行跳过，因此同一命令在离线工作流里是离线测试。
+      - name: Test against live pixiv
+        run: make test
+        env:
+          PIXIV_LIVE: "1"
