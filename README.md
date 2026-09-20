@@ -68,6 +68,12 @@ routed := client.New(client.WithTransport(client.NewRoutedTransport(&http.Transp
     Proxy: http.ProxyURL(proxyURL),
 })))
 
+// 对托管在 Cloudflare 的主机施加 ECH (外层 SNI 为 cloudflare-ech.com)。
+// 未提供配置时原语自行取得, 配置轮换时自行恢复; 不适用于 pixiv 自有源站。
+ech := client.New(client.WithTransport(client.NewECHTransport(&http.Transport{
+    Proxy: http.ProxyURL(proxyURL),
+})))
+
 // 注入自己的解析器; 它只被库自带的连接能力使用。
 resolved := client.New(
     client.WithDNSResolver(dns.NewDOHResolver("https://1.1.1.1/dns-query")),

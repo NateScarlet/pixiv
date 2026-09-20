@@ -174,6 +174,77 @@ DoH 端点的支持情况
 - 公钥必须是**合法的 X25519 点**。使用全零等非法值会在本地报
   ``crypto/ecdh: bad X25519 point``；若目的是让服务端无法解密，
   应使用一个合法但服务端并不持有对应私钥的公钥。
+- 列表与单条的封装不同，容易写错：客户端的 ``EncryptedClientHelloConfigList``
+  是**一个**位于最前的 ``uint16`` 长度（等于其余字节数），其后直接跟各条配置；
+  每条配置自带 ``version+length`` 头，**条目之间不得再有长度前缀**。
+  服务端的 ``EncryptedClientHelloKeys`` 则吃**裸条目**（``version+length+body``）。
+  多写一层前缀会在解析时报 ``malformed ECHConfig, invalid length field``。
+
+在库中使用 ECH
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``NewECHTransport`` 提供一个施加 ECH 的传输原语：接收一个底层传输作为依赖，
+在其之上叠加「用加密的 ClientHello 连接」这一种能力。
+它与 ``NewNoSNITransport`` 同为原语，同样不含主机判断，也不含环境判断。
+
+.. code-block:: go
+
+    // 直连施加 ECH：这正是 ECH 的用途，绕开按 SNI 的封锁。
+    // 不要经代理跑 ECH——代理本身已经绕过了封锁，那样验证不出 ECH 是否生效。
+    direct := client.New(client.WithTransport(client.NewECHTransport(&http.Transport{})))
+
+    // 与代理组合也是支持的：底层传输带代理时，请求经代理发出且 ECH 仍然生效。
+    // 但这验证的是「叠加不破坏既有管道」，不是 ECH 的作用。
+    viaProxy := client.New(client.WithTransport(client.NewECHTransport(&http.Transport{
+        Proxy: http.ProxyURL(proxyURL),
+    })))
+
+    // 由调用者提供配置（例如已有可靠的配置分发渠道）。
+    withConfig := client.New(client.WithTransport(client.NewECHTransport(
+        &http.Transport{},
+        client.WithECHConfigList(myECHConfigList),
+    )))
+
+直连时若系统解析返回被污染的地址，配合本库的解析器使用（见上文「现状概览」）：
+
+.. code-block:: go
+
+    c := client.New(
+        client.WithTransport(client.NewECHTransport(&http.Transport{})),
+        client.WithDNSResolver(dns.NewDOHResolver("https://1.1.1.1/dns-query")),
+    )
+
+要点：
+
+- **适用范围是托管在 Cloudflare 的主机**。对不在 Cloudflare 之后的主机
+  （如 ``i.pximg.net``），其证书与 ECH 的外层名不匹配，ECH 不适用。
+  原语不做主机分派：由了解自身环境的调用者决定何时用它。
+- **外层名固定为 ``cloudflare-ech.com``**（可用 ``WithECHPublicName`` 覆盖，
+  但仅当目标使用其它 ECH 提供方时才需要）。该名字写在 ECHConfig 的
+  ``public_name`` 字段内，由配置携带，不由原语另行设置。
+- **配置轮换自愈是运行时行为**：服务端无法解密时会下发 ``retry_configs``，
+  原语用它重试并记住新配置，不需要重启或外部文件。服务端明确拒绝且未下发配置时
+  返回错误，不静默退回明文握手。
+- **不使用 ``DialTLSContext``**。标准库文档明确它只对 non-proxied 请求生效，
+  存在代理时被静默忽略；原语用 ``TLSClientConfig`` 施加 ECH，故能与代理共存。
+- **自行提供静态配置意味着承担轮换**：若配置过期而服务端又不下发新配置，
+  连接会持续失败。
+- 经由本库默认客户端使用时，自举同样走请求上下文中的解析器，
+  因此不会被迫使用系统解析。
+
+如何取得一份 ECHConfigList
+++++++++++++++++++++++++++
+
+一般不需要自己取：不传 ``WithECHConfigList`` 时原语会自行取得。
+需要自行分发配置（例如多实例共享）时，有两种途径：
+
+1. **DoH 查询 HTTPS 记录（type 65）**，从记录中取出 ``ech=`` 参数。
+   需要选用支持 type 65 的端点，见上文「DoH 端点的支持情况」。
+   注意不支持 type 65 的端点会返回空结果而非报错，容易误判为「该域名没有配置」。
+2. **发送一份无法解密的配置，换取服务端下发的 ``retry_configs``**。
+   这正是原语的自举途径，不需要 DNS，也不需要预先持有任何配置。
+
+无论哪条途径，取回的配置都会轮换（见下文），因此自行分发时也必须处理更新。
 
 轮换
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
