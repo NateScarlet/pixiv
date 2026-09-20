@@ -79,7 +79,8 @@ func (rank Rank) URL(ctx context.Context) *url.URL {
 // Deprecated: use [FetchRank] instead.
 // Fetch rank
 func (rank *Rank) Fetch(ctx context.Context) (err error) {
-	resp, err := client.For(ctx).GetWithContext(ctx, rank.URLWithQuery(ctx, &url.Values{"format": {"json"}}).String())
+	var q = &url.Values{"format": {"json"}}
+	resp, err := client.For(ctx).GetWithContext(ctx, rank.URLWithQuery(ctx, q).String())
 	if err != nil {
 		return
 	}

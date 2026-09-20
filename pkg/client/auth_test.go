@@ -4,6 +4,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/NateScarlet/pixiv/internal/testenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -13,9 +14,7 @@ func TestLoginFromPHPSESSID(t *testing.T) {
 		t.Skip()
 		return
 	}
-	var c = new(Client)
-	c.SetPHPSESSID(os.Getenv("PIXIV_PHPSESSID"))
-	c.SetDefaultHeader("User-Agent", DefaultUserAgent)
+	var c = New(WithPHPSESSID(os.Getenv("PIXIV_PHPSESSID")))
 	v, err := c.IsLoggedIn()
 	require.NoError(t, err)
 	assert.True(t, v)
@@ -29,7 +28,7 @@ func TestLogin(t *testing.T) {
 		t.Skip("need credentials")
 		return
 	}
-	c := Client{}
+	c := New()
 	err := c.Login(username, password)
 	require.NoError(t, err)
 	v, err := c.IsLoggedIn()
@@ -38,7 +37,8 @@ func TestLogin(t *testing.T) {
 }
 
 func TestIsLoggedIn(t *testing.T) {
-	v, err := Client{}.IsLoggedIn()
+	testenv.RequireLive(t)
+	v, err := New().IsLoggedIn()
 	require.NoError(t, err)
 	assert.False(t, v)
 }

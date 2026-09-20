@@ -9,26 +9,30 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/NateScarlet/pixiv/pkg/client/dns"
 	"github.com/tidwall/gjson"
 )
 
 // Client to send request to pixiv server.
+//
+// 零值是安全的：它是一个不做任何特殊处理的标准 HTTP 客户端。
+// 要得到本库的默认行为（默认传输、默认 User-Agent、环境变量播种的凭据），用 [New]。
+// 一个 Client 可被多个 goroutine 并发使用，也可被值拷贝。
 type Client struct {
-	ServerURL   string
-	DNSResolver dns.Resolver
+	// 服务地址，由 [WithServerURL] 设置，在 [New] 装配期解析校验。
+	serverURL string
 	http.Client
 }
 
 // EndpointURL returns url for server endpint.
 func (c Client) EndpointURL(path string, values *url.Values) *url.URL {
-	s := c.ServerURL
+	s := c.serverURL
 	if s == "" {
-		s = "https://www.pixiv.net"
+		// 零值客户端按约定使用默认服务地址。
+		s = defaultServerURL
 	}
-
 	u, err := url.Parse(s)
 	if err != nil {
+		// 服务地址已在 [New] 装配期校验，运行时到不了这里。
 		panic(err)
 	}
 	u.Path = path
@@ -87,3 +91,6 @@ func ParseAPIResult(r io.Reader) (ret gjson.Result, err error) {
 	}
 	return
 }
+
+// Default 客户端，与 [New] 走同一装配路径。
+var Default = New()

@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/NateScarlet/pixiv/internal/testenv"
 	"github.com/NateScarlet/pixiv/pkg/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,6 +15,7 @@ import (
 )
 
 func TestSearchNovel(t *testing.T) {
+	testenv.RequireLive(t)
 	var ctx = context.Background()
 	result, err := Search(ctx, "パチュリー・ノーレッジ")
 	require.NoError(t, err)
@@ -43,8 +45,7 @@ func TestSearchResultNovelsFillsDescription(t *testing.T) {
 	}))
 	defer server.Close()
 
-	c := new(client.Client)
-	c.ServerURL = server.URL
+	c := client.New(client.WithServerURL(server.URL))
 	ctx := client.With(context.Background(), c)
 
 	result, err := Search(ctx, "検索語")

@@ -86,17 +86,25 @@ SNI 阻断机制
 但并非稳定——实测中有少数地址仍被重置，故不应依赖它作为可靠手段。
 未发送 SNI 时，握手能否完成取决于服务端是否接受不携带 SNI 的连接。
 
-``BypassSNIBlocking`` 的失效
+不发送 SNI 的实现与失效范围
 --------------------------------
 
-本节说明 ``pkg/client/bypass_sni_blocking.go`` 现有机制为何不再能完成直连。
+本节说明 ``pkg/client/transport.go`` 中不发送 SNI 的实现，以及为何它只对 ``i.pximg.net`` 仍然有效。
 
-机制原本依赖两点配合：
+机制依赖两点配合：
 
-1. ``www.pixiv.net`` 解析到 Cloudflare 地址，而无 SNI 时 Cloudflare 无法路由，
-   因此通过 ``HostReplacer`` 把 ``www.pixiv.net`` 改写为 ``pixiv.net`` 再解析，
-   以获得 Pixiv 自有源站地址；
+1. 用库自带的 DoH 解析器解析目标主机，避开被污染的系统解析
+   （解析器随请求传递给自行拨号的传输，端点由 ``PIXIV_DNS_QUERY_URL`` 播种）；
 2. 与源站握手时**不发送 SNI**，从而避开基于 SNI 的封锁。
+
+第 2 步由传输原语 ``NewNoSNITransport`` 提供，以 ``TLSClientConfig`` 实现
+（``ServerName`` 设为 IP 字面量，``crypto/tls`` 对 IP 字面量不生成 SNI 扩展）。
+它不使用 ``DialTLSContext``：标准库文档明确后者只对 non-proxied 请求生效，
+存在代理时被静默忽略。
+
+``NewRoutedTransport`` 持有「哪些主机该用哪种方式」的清单，目前只有
+``i.pximg.net`` 走不发送 SNI 的方式；``AutoTransport`` 在此之上做自动选择，
+``DefaultTransport`` 默认为它。
 
 实测表明第 2 步已被服务端拒绝：连接到源站、不发送 SNI 时，TLS 握手可以完成、
 证书校验也通过（证书为 ``*.pixiv.net``），但 HTTP 层返回 nginx 的 ``403 Forbidden``。

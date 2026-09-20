@@ -5,6 +5,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/NateScarlet/pixiv/internal/testenv"
 	"github.com/NateScarlet/pixiv/pkg/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -12,6 +13,7 @@ import (
 )
 
 func TestSearchArtwork(t *testing.T) {
+	testenv.RequireLive(t)
 	var ctx = context.Background()
 	result, err := Search(ctx, "パチュリー・ノーレッジ")
 	require.NoError(t, err)
@@ -46,9 +48,7 @@ func TestSearchR18Artwork(t *testing.T) {
 		t.Skip()
 		return
 	}
-	var c = new(client.Client)
-	c.SetPHPSESSID(os.Getenv("PIXIV_PHPSESSID"))
-	c.SetDefaultHeader("User-Agent", client.DefaultUserAgent)
+	var c = client.New(client.WithPHPSESSID(os.Getenv("PIXIV_PHPSESSID")))
 
 	ctx := client.With(context.Background(), c)
 	result, err := Search(

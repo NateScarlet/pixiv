@@ -43,12 +43,12 @@ type Novel struct {
 	Tags           []string
 	EmbeddedImages map[string]image.URLs
 
-	TextCount     int64
-	PageCount     int64
-	CommentCount  int64
-	LikeCount     int64
-	ViewCount     int64
-	BookmarkCount int64
+	TextCount      int64
+	PageCount      int64
+	CommentCount   int64
+	LikeCount      int64
+	ViewCount      int64
+	BookmarkCount  int64
 	CreationMethod CreationMethod
 }
 

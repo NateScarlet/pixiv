@@ -59,6 +59,8 @@ post_key
 
 自动登录有时会触发 reCAPTCHA 验证， 所以支持直接设置 ``PHPSESSID``。
 
-如果存在 ``PIXIV_PHPSESSID`` 变量将尝试直接使用此值作为登录凭据，登录无效时再尝试使用账号密码登录。
+用 ``client.WithPHPSESSID`` 选项提供，例如 ``client.New(client.WithPHPSESSID(os.Getenv("PIXIV_PHPSESSID")))``。
+
+未显式设置时，如果存在 ``PIXIV_PHPSESSID`` 变量将尝试直接使用此值作为登录凭据，登录无效时再尝试使用账号密码登录。
 
 

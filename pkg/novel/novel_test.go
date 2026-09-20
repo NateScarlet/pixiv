@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NateScarlet/pixiv/internal/testenv"
 	"github.com/NateScarlet/pixiv/pkg/client"
 	"github.com/NateScarlet/snapshot/pkg/snapshot"
 	"github.com/stretchr/testify/assert"
@@ -54,7 +55,8 @@ func TestFetchNovel(t *testing.T) {
 	assert.GreaterOrEqual(t, i.LikeCount, int64(3178))
 	assert.GreaterOrEqual(t, i.ViewCount, int64(21955))
 	assert.GreaterOrEqual(t, i.BookmarkCount, int64(3690))
-	assert.Equal(t, "https://www.pixiv.net/novel/show.php?id=11983096", i.URL(ctx).String())
+	u := i.URL(ctx)
+	assert.Equal(t, "https://www.pixiv.net/novel/show.php?id=11983096", u.String())
 }
 
 func TestFetchNovelWithEmbeddedImages(t *testing.T) {
@@ -76,8 +78,7 @@ func TestFetchNovelNullEmbeddedImages(t *testing.T) {
 	}))
 	defer server.Close()
 
-	c := new(client.Client)
-	c.ServerURL = server.URL
+	c := client.New(client.WithServerURL(server.URL))
 	ctx := client.With(context.Background(), c)
 
 	i := Novel{ID: "29047862"}
@@ -95,8 +96,7 @@ func fetchNovelFromMock(t *testing.T, body string) Novel {
 	}))
 	t.Cleanup(server.Close)
 
-	c := new(client.Client)
-	c.ServerURL = server.URL
+	c := client.New(client.WithServerURL(server.URL))
 	ctx := client.With(context.Background(), c)
 
 	i := Novel{ID: "28612019"}
@@ -119,9 +119,7 @@ func TestFetchNovelWithoutSeriesNavDataKeepsZeroSeries(t *testing.T) {
 // TestFetchNovelSeriesLive 验证真实匿名接口解析 seriesNavData(issue #84 样本: 28612019)。
 // 匿名接口无需登录;需要网络可用并配合代理访问 pixiv。
 func TestFetchNovelSeriesLive(t *testing.T) {
-	if os.Getenv("PIXIV_LIVE") == "" {
-		t.Skip("set PIXIV_LIVE=1 to run live tests")
-	}
+	testenv.RequireLive(t)
 	i := Novel{ID: "28612019"}
 	err := i.Fetch(context.Background())
 	require.NoError(t, err)

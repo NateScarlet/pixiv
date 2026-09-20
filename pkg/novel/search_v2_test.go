@@ -5,9 +5,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
+	"github.com/NateScarlet/pixiv/internal/testenv"
 	"github.com/NateScarlet/pixiv/pkg/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,8 +25,7 @@ func searchV2PayloadFromMock(t *testing.T, body string) SearchPayload {
 	}))
 	t.Cleanup(server.Close)
 
-	c := new(client.Client)
-	c.ServerURL = server.URL
+	c := client.New(client.WithServerURL(server.URL))
 	ctx := client.With(context.Background(), c)
 
 	p, err := SearchV2(ctx, "検索語")
@@ -73,9 +72,7 @@ func TestSearchV2RequiresQuery(t *testing.T) {
 
 // TestSearchV2Live 验证真实匿名接口的搜索响应解析(含字段名与 isAdContainer 广告条目)。
 func TestSearchV2Live(t *testing.T) {
-	if os.Getenv("PIXIV_LIVE") == "" {
-		t.Skip("set PIXIV_LIVE=1 to run live tests")
-	}
+	testenv.RequireLive(t)
 	p, err := SearchV2(context.Background(), "パチュリー・ノーレッジ")
 	require.NoError(t, err)
 	var n int

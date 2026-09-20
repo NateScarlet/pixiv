@@ -28,9 +28,11 @@ package main
 
 import (
     "context"
+    "net/http"
     "slices"
 
     "github.com/NateScarlet/pixiv/pkg/client"
+    "github.com/NateScarlet/pixiv/pkg/client/dns"
     "github.com/NateScarlet/pixiv/pkg/artwork"
     "github.com/NateScarlet/pixiv/pkg/novel"
     "github.com/NateScarlet/pixiv/pkg/user"
@@ -40,17 +42,36 @@ import (
 // 并且 User-Agent 使用 `PIXIV_USER_AGENT` 或库内置的默认值。
 client.Default
 
-// 使用 PHPSESSID Cookie 登录 (推荐)。
-c := &client.Client{}
-c.SetDefaultHeader("User-Agent", client.DefaultUserAgent)
-c.SetPHPSESSID("PHPSESSID")
+// 用选项构建客户端：显式设置的项胜出，未设置的项才由默认值填充。
+// 装配只发生在 New 一处，构造过程不发任何请求。
+c := client.New(
+    client.WithPHPSESSID("PHPSESSID"), // 用 PHPSESSID Cookie 登录 (推荐)
+    client.WithUserAgent("Mozilla/5.0 ..."),
+)
 
-// 启用免代理，环境变量 `PIXIV_BYPASS_SNI_BLOCKING` 不为空时自动为默认客户端启用免代理。
-// 当前实现需求一个 DNS over HTTPS 服务，默认使用 cloudflare，可通过 `PIXIV_DNS_QUERY_URL` 环境变量设置。
-// 必须在其他客户端选项前调用 `BypassSNIBlocking`，因为对于封锁的域名它会使用一个更改过的 Transport 进行请求，无视在它之前进行的的设置。
-c := &client.Client{}
-c.BypassSNIBlocking()
-c.SetDefaultHeader("User-Agent", client.DefaultUserAgent)
+// 指定服务地址 (测试或镜像场景)。
+mirror := client.New(client.WithServerURL("https://mirror.example.com"))
+
+// 注入自己的 Transport 以使用代理或任何自定义管道; 优先级高于 DefaultTransport。
+proxied := client.New(client.WithTransport(&http.Transport{
+    Proxy: http.ProxyURL(proxyURL),
+}))
+
+// 需要自行控制传输层时, 用库提供的传输原语组合管道。
+// 原语不含主机判断: 单独使用时由调用者决定何时用它。
+noSNI := client.New(client.WithTransport(client.NewNoSNITransport(&http.Transport{
+    Proxy: http.ProxyURL(proxyURL),
+})))
+
+// 或者让库按主机自动选用合适的方式 (主机清单由库持有, 随依赖升级更新)。
+routed := client.New(client.WithTransport(client.NewRoutedTransport(&http.Transport{
+    Proxy: http.ProxyURL(proxyURL),
+})))
+
+// 注入自己的解析器; 它只被库自带的连接能力使用。
+resolved := client.New(
+    client.WithDNSResolver(dns.NewDOHResolver("https://1.1.1.1/dns-query")),
+)
 
 // 所有查询从 context 获取客户端设置, 如未设置将使用默认客户端。
 var ctx = context.Background()

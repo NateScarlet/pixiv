@@ -5,11 +5,13 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/NateScarlet/pixiv/internal/testenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestFetchRank(t *testing.T) {
+	testenv.RequireLive(t)
 	payload, err := FetchRank(context.Background(), DailyRank)
 	require.NoError(t, err)
 	var n int

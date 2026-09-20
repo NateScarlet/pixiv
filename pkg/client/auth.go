@@ -10,7 +10,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-// IsLoggedIn checks login status base on `HEAD https://www.pixiv.net/setting_user.php`
+// IsLoggedIn checks login status base on `HEAD <server url>/setting_user.php`
 // response status.
 func (c Client) IsLoggedIn() (ret bool, err error) {
 	c.CheckRedirect = func(req *http.Request, via []*http.Request) error {
@@ -83,8 +83,10 @@ func (c *Client) Login(username string, password string) (err error) {
 	return
 }
 
-// SetPHPSESSID set client cookie to skip login.
-func (c *Client) SetPHPSESSID(v string) {
+// setPHPSESSID 让客户端带上 PHPSESSID Cookie 以跳过登录。
+//
+// 服务地址已在 [New] 装配期校验，这里解析失败属于装配内部错误，直接快速失败。
+func (c *Client) setPHPSESSID(v string) {
 	c.ensureJar()
 
 	c.Jar.SetCookies(

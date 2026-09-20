@@ -5,9 +5,9 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
+	"github.com/NateScarlet/pixiv/internal/testenv"
 	"github.com/NateScarlet/pixiv/pkg/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -25,8 +25,7 @@ func fetchPayloadFromMock(t *testing.T, body string) FetchPayload {
 	}))
 	t.Cleanup(server.Close)
 
-	c := new(client.Client)
-	c.ServerURL = server.URL
+	c := client.New(client.WithServerURL(server.URL))
 	ctx := client.With(context.Background(), c)
 
 	p, err := Fetch(ctx, "147500314")
@@ -72,9 +71,7 @@ func TestFetchPayloadWithoutSeriesReturnsZeroSeries(t *testing.T) {
 // TestFetchPayloadSeriesLive 验证真实匿名接口解析 seriesNavData(issue #84 样本: 147500314)。
 // 匿名接口无需登录;需要网络可用并配合代理访问 pixiv。
 func TestFetchPayloadSeriesLive(t *testing.T) {
-	if os.Getenv("PIXIV_LIVE") == "" {
-		t.Skip("set PIXIV_LIVE=1 to run live tests")
-	}
+	testenv.RequireLive(t)
 	p, err := Fetch(context.Background(), "147500314")
 	require.NoError(t, err)
 	s := p.Series()

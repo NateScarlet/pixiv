@@ -5,11 +5,13 @@ import (
 	"testing"
 	"time"
 
+	"github.com/NateScarlet/pixiv/internal/testenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestFetchArtwork(t *testing.T) {
+	testenv.RequireLive(t)
 	i := Artwork{ID: "22238487"}
 	err := i.Fetch(context.Background())
 	t.Log(i)
@@ -27,10 +29,12 @@ func TestFetchArtwork(t *testing.T) {
 	assert.LessOrEqual(t, int64(54), i.LikeCount)
 	assert.LessOrEqual(t, int64(899), i.ViewCount)
 	assert.LessOrEqual(t, int64(12), i.BookmarkCount)
-	assert.Equal(t, "https://www.pixiv.net/artworks/22238487", i.URL(context.Background()).String())
+	u := i.URL(context.Background())
+	assert.Equal(t, "https://www.pixiv.net/artworks/22238487", u.String())
 }
 
 func TestFetchPages(t *testing.T) {
+	testenv.RequireLive(t)
 	i := Artwork{ID: "52200823"}
 	err := i.FetchPages(context.Background())
 	require.NoError(t, err)

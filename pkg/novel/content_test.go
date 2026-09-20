@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/NateScarlet/pixiv/internal/testenv"
 	"github.com/NateScarlet/snapshot/pkg/snapshot"
 	"github.com/stretchr/testify/require"
 )
@@ -34,6 +35,7 @@ p3
 	})
 
 	t.Run("real", func(t *testing.T) {
+		testenv.RequireLive(t)
 		i := Novel{ID: "14443124"}
 		err := i.Fetch(ctx)
 		require.NoError(t, err)
