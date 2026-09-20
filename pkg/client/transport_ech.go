@@ -168,6 +168,14 @@ func (t *echTransport) transportWith(configList []byte) *http.Transport {
 		return verifyECHOuterCert(cs, t.publicName, tlsCfg.RootCAs)
 	}
 	out.TLSClientConfig = tlsCfg
+	// 数据连接与不发送 SNI 的原语走同一条解析接缝：解析器由请求上下文注入，
+	// 未注入时回落到底层拨号函数（即系统解析）。
+	//
+	// 这里不传固定主机名：本传输只承载一个主机（路由传输按主机各建一份），
+	// 但单份传输也可能被复用于不同目标，故按拨号目标判断，IP 字面量不解析——
+	// 与单独使用 NewNoSNITransport 的语义一致。经代理时拨号的是代理地址，
+	// 解析交由代理完成。
+	out.DialContext = resolverDialContext(out.DialContext, "")
 	return out
 }
 
