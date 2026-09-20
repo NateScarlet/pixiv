@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -81,9 +82,9 @@ func FromURL(rawURL string) (_ URLs, err error) {
 		return URLs{}, unrecognized(rawURL)
 	}
 
-	switch pathSeg {
-	case "img-master", "custom-thumb", "img-original":
-	default:
+	// 只有画作各尺寸所在的段具备可重建的结构；小说封面、头像等虽可识别为图片
+	// (见 [IsImageURL])，但没有对应的各尺寸地址可推导。
+	if !slices.Contains(artworkPathSegments, pathSeg) {
 		return URLs{}, unrecognized(rawURL)
 	}
 
@@ -111,6 +112,71 @@ func FromURL(rawURL string) (_ URLs, err error) {
 		Regular:  cdnURL(u, "/img-master"+imgPath+base+"_master1200."+ext),
 		Original: cdnURL(u, "/img-original"+imgPath+base+"."+ext),
 	}, nil
+}
+
+// pathSegments 列出 pixiv 图片 CDN 用于区分图片类别的路径段，即本包掌握的
+// pixiv 侧布局知识所在。[IsImageURL] 以此判读一个地址是不是图片。
+//
+// 缩略图带 /c/{size}/ 前缀，且段可能带尺寸或类别后缀（如 novel-cover-original），
+// 因此段不一定位于首段、也不一定与这里的字面量完全相等。
+var pathSegments = []string{
+	"img-master",   // 画作（含各缩放尺寸）
+	"img-original", // 画作原图
+	"custom-thumb", // 作者自定义裁剪的缩略图
+	"novel-cover",  // 小说封面
+	"user-profile", // 用户头像
+	"background",   // 用户背景图
+}
+
+// artworkPathSegments 是 [PathSegments] 中具备各尺寸结构、因而可被 [FromURL]
+// 重建地址的那部分。它从 pathSegments 派生，两者不会各写一份而漂移。
+var artworkPathSegments = slices.DeleteFunc(slices.Clone(pathSegments), func(seg string) bool {
+	switch seg {
+	case "img-master", "img-original", "custom-thumb":
+		return false
+	default:
+		return true
+	}
+})
+
+// PathSegments 返回 pixiv 图片 CDN 用于区分图片类别的路径段。
+//
+// 返回副本，调用者改动它不会影响本包的判读与重建。
+func PathSegments() []string { return slices.Clone(pathSegments) }
+
+// ArtworkPathSegments 返回 [PathSegments] 中具备各尺寸结构的那部分。
+func ArtworkPathSegments() []string { return slices.Clone(artworkPathSegments) }
+
+// IsImageURL 报告地址是否指向 pixiv 图片 CDN 上的图片。
+//
+// 它只做结构判断，不校验主机名：pixiv 图片虽只在自有源站提供，但按主机校验
+// 会让本地端点（测试用的 httptest 服务）无法被识别，而主机可达性本来就由
+// 请求结果回答。它也不要求地址能被 [FromURL] 重建各尺寸——小说封面、头像等
+// 并不具备画作那样的尺寸结构，但仍然是可以取回的图片。
+func IsImageURL(rawURL string) bool {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return false
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return false
+	}
+	if u.Host == "" {
+		return false
+	}
+	return isImagePath(u.Path)
+}
+
+// isImagePath 判断路径是否落在 pathSegments 列出的段之下。
+func isImagePath(path string) bool {
+	for _, seg := range strings.Split(strings.Trim(path, "/"), "/") {
+		for _, known := range pathSegments {
+			if seg == known || strings.HasPrefix(seg, known+"-") {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // cdnURL 用传入 URL 的协议与主机拼接出新的 CDN 图片地址

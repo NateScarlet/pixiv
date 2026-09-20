@@ -17,15 +17,22 @@ import (
 )
 
 // spyTransport 记录经过它的请求，用于在不触网的前提下断言请求的可观测特征。
+//
+// next 为空时用固定的空响应对答，用例可只看请求；非空时把请求转给它，
+// 从而让同一用例既能断言请求特征、又能断言真实响应内容。
 type spyTransport struct {
 	mu       sync.Mutex
 	requests []*http.Request
+	next     http.RoundTripper
 }
 
 func (t *spyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	t.mu.Lock()
 	t.requests = append(t.requests, req)
 	t.mu.Unlock()
+	if t.next != nil {
+		return t.next.RoundTrip(req)
+	}
 	return &http.Response{
 		StatusCode: http.StatusOK,
 		Header:     make(http.Header),

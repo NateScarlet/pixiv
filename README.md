@@ -28,7 +28,10 @@ package main
 
 import (
     "context"
+    "fmt"
+    "io"
     "net/http"
+    "os"
     "slices"
 
     "github.com/NateScarlet/pixiv/pkg/client"
@@ -121,6 +124,32 @@ if series := art.Series(); !series.IsZero() {
 pages, _ := artwork.FetchPages(ctx, "22238487")
 for page := range pages.Pages() {
     fmt.Println("原图地址:", page.OriginalURL())
+}
+
+// 取回图片内容; 方法自动带上必需的 Referer, 并按主机把请求交给合适的传输。
+// 它只返回响应、不落盘: 写文件、解码、算哈希都由调用者自行决定。
+for i, page := range slices.Collect(pages.Pages()) {
+    resp, err := client.For(ctx).FetchImage(ctx, page.OriginalURL())
+    if err != nil {
+        fmt.Println("取回失败:", err)
+        break
+    }
+    // 格式从响应读取, 不要按 URL 扩展名推断 (原图尤其如此)。
+    fmt.Println("格式:", resp.Header.Get("Content-Type"))
+    // 可直接流式写出, 不必先把大图读进内存。
+    f, err := os.Create(fmt.Sprintf("22238487_p%d.png", i))
+    if err != nil {
+        resp.Body.Close()
+        fmt.Println("创建文件失败:", err)
+        break
+    }
+    _, err = io.Copy(f, resp.Body)
+    resp.Body.Close()
+    f.Close()
+    if err != nil {
+        fmt.Println("写入失败:", err)
+        break
+    }
 }
 
 // 搜索小说 (不可变记录, 已知字段方法 + Raw() 获取未建模字段)
