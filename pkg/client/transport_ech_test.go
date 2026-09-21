@@ -227,6 +227,65 @@ func TestECHTransportBootstrapsWithoutExtraLookup(t *testing.T) {
 	}
 }
 
+// TestECHTransportDataConnUsesResolver 断言 ECH 的数据连接经注入的解析器解析目标主机。
+//
+// 自举那一跳本来就解析目标主机，因此这里刻意**提供配置**以跳过自举，
+// 从而只考察数据连接的拨号路径。只解开 SNI 封锁而不解决解析的话，
+// 请求仍会连到系统解析给出的地址上，在 DNS 被污染的网络里表现为直连不可用。
+func TestECHTransportDataConnUsesResolver(t *testing.T) {
+	es := newECHTestServer(t, true)
+
+	var mu sync.Mutex
+	var resolved []string
+	resolver := resolverFunc(func(ctx context.Context, host string) ([]net.IP, error) {
+		mu.Lock()
+		resolved = append(resolved, host)
+		mu.Unlock()
+		// 指向本地测试服务端，使连接可建立。
+		return []net.IP{net.ParseIP("127.0.0.1")}, nil
+	})
+
+	// 记录拨号目标：若数据连接未作解析，这里会看到原始主机名。
+	var muDial sync.Mutex
+	var dialed []string
+	base := es.transport()
+	prevDial := base.DialContext
+	base.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		muDial.Lock()
+		dialed = append(dialed, addr)
+		muDial.Unlock()
+		if prevDial != nil {
+			return prevDial(ctx, network, addr)
+		}
+		var d net.Dialer
+		return d.DialContext(ctx, network, addr)
+	}
+
+	// 提供配置 → 跳过自举 → 只有数据连接
+	rt := NewECHTransport(base, WithECHConfigList(echTestServerConfigList(t, es)))
+	c := New(WithTransport(rt), WithDNSResolver(resolver))
+
+	resp, err := c.Get("https://" + echTestRealHost + "/")
+	require.NoError(t, err, "提供了正确配置时应能建立 ECH 连接")
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Contains(t, resolved, echTestRealHost,
+		"ECH 数据连接应经注入的解析器解析目标主机")
+
+	muDial.Lock()
+	defer muDial.Unlock()
+	for _, addr := range dialed {
+		host, _, splitErr := net.SplitHostPort(addr)
+		require.NoError(t, splitErr)
+		assert.NotEqual(t, echTestRealHost, host,
+			"数据连接不应把原始主机名直接交给系统解析，而应拨向解析得到的地址")
+	}
+}
+
 // TestECHTransportHealsAfterConfigRotation 断言配置轮换后原语能在运行时自愈：
 // 使用一份服务端已不认识的配置时，服务端下发新配置，原语用它重试并成功，
 // 不需要重启或外部文件。
