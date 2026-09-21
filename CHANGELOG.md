@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.8.3](https://github.com/NateScarlet/pixiv/compare/v0.8.2...v0.8.3) (2026-09-21)
+
+
+### Features
+
+* **dns:** allow injecting the HTTP client used for DoH queries ([70a53c4](https://github.com/NateScarlet/pixiv/commit/70a53c46636f48526e3af893d37732af1fd9eafa))
+
+
+### Bug Fixes
+
+* **client:** should resolve ECH data connections with the injected resolver ([e8e9e34](https://github.com/NateScarlet/pixiv/commit/e8e9e3472abea936baff7056251cb6a38029a7a5)), closes [#94](https://github.com/NateScarlet/pixiv/issues/94)
+* **dns:** should resolve its own proxy via the system resolver ([45f4f1d](https://github.com/NateScarlet/pixiv/commit/45f4f1d027d3b9f8c968515a3424e8ec409ca63a))
+
 ## [0.8.2](https://github.com/NateScarlet/pixiv/compare/v0.8.1...v0.8.2) (2026-09-21)
 
 
