@@ -81,15 +81,17 @@ func WithECHPublicName(name string) ECHOption {
 // retry_configs，本传输用它重试并记住新配置，因此不需要重启或外部定时任务。
 // 服务端明确拒绝且未下发配置时返回错误，不静默退回明文握手。
 //
-// # 与代理组合
+// # 与代理的关系
+//
+// ECH 主机的数据连接**不走代理**，即使 base 配置了代理（包括 HTTPS_PROXY
+// 环境变量）也直连。ECH 的意义就是直连时绕开按 SNI 的封锁；经代理时封锁本就
+// 被代理绕过，ECH 不再有意义，而且会让「ECH 是否生效」失去可观测性。
+// 绕开代理只作用于本传输发出的请求：base 自身的代理设置不被修改，
+// 调用者的其他传输照常使用代理。
 //
 // 需要 TLS 1.3。本传输不使用 DialTLSContext：标准库文档明确后者只对 non-proxied
-// 请求生效，存在代理时被静默忽略，能力不生效且无任何提示。TLSClientConfig
-// 可与代理共存，代理由 base 自理，因此本传输可与代理叠加使用。
-//
-// 需要注意用途：ECH 的意义在于**直连**时绕开按 SNI 的封锁。经代理发起请求时
-// 封锁本就被代理绕过，ECH 不增加价值；支持与代理组合是为了让本原语能叠加在
-// 调用者既有的管道上，而不是建议这么用。
+// 请求生效，存在代理时被静默忽略，能力不生效且无任何提示。TLSClientConfig 承载
+// ECH，直连所需的拨号能力由 base 提供。
 //
 // 返回的传输不改变调用者的 base，因此可与其他原语嵌套组合。
 //
@@ -168,6 +170,13 @@ func (t *echTransport) transportWith(configList []byte) *http.Transport {
 		return verifyECHOuterCert(cs, t.publicName, tlsCfg.RootCAs)
 	}
 	out.TLSClientConfig = tlsCfg
+	// ECH 的用途是直连时绕开按 SNI 的封锁，因此数据连接不走代理：
+	// 经代理时封锁本就被代理绕过，ECH 不再有意义，且会让「ECH 是否生效」
+	// 失去可观测性。这里清空代理设置，只保留底层传输的拨号能力。
+	//
+	// 调用者的拨号函数仍需保留：它承载注入的解析器（见 [resolverDialContext]），
+	// 直连时正是靠它避开被污染的系统解析。
+	out.Proxy = nil
 	return out
 }
 
@@ -295,43 +304,22 @@ func verifyECHOuterCert(cs tls.ConnectionState, publicName string, roots *x509.C
 //
 // bootstrapHandshake 用给定配置发起一次自举握手，并返回服务端下发的 retry_configs。
 //
-// 它复用底层传输的代理与解析设置：不经代理时经注入的解析器解析目标主机；
-// 经代理时由 net/http 自身完成 CONNECT 协商与认证，本包不重复实现。
+// 自举与数据连接走同一条直连路径，不使用代理：它取回的配置正是给直连用的，
+// 经代获取的配置与直连时的实际行为不对应。
+//
+// 目标主机名经请求上下文中注入的解析器解析（见 [resolverDialContext]）：
+// 系统解析可能返回被污染的地址，自举不应假设它可用。
 func (t *echTransport) bootstrapHandshake(
 	ctx context.Context, host, port string, probeTLS *tls.Config,
 ) ([]byte, error) {
 	addr := net.JoinHostPort(host, port)
-
-	if t.base.Proxy == nil {
-		// 与不发送 SNI 的原语走同一条解析接缝：解析器由请求上下文注入，
-		// 未注入时回落到底层拨号函数（即系统解析）。
-		rawConn, err := resolverDialContext(t.base.DialContext, host)(ctx, "tcp", addr)
-		if err != nil {
-			return nil, err
-		}
-		conn := tls.Client(rawConn, probeTLS)
-		defer conn.Close()
-		return retryConfigsFromHandshake(conn.HandshakeContext(ctx))
-	}
-
-	// 经代理时借底层传输自身的代理能力建立隧道。
-	probeTransport := t.base.Clone()
-	probeTransport.TLSClientConfig = probeTLS
-	probeTransport.ForceAttemptHTTP2 = false
-	if probeTransport.TLSClientConfig.NextProtos == nil {
-		probeTransport.TLSClientConfig.NextProtos = []string{"http/1.1"}
-	}
-	// 用一次请求驱动握手：请求不会真正发出，因为自举配置必然被服务端拒绝，
-	// 握手会在写出任何 HTTP 报文之前以 ECHRejectionError 结束。
-	req, err := http.NewRequestWithContext(ctx, http.MethodHead, "https://"+addr+"/", nil)
+	rawConn, err := resolverDialContext(t.base.DialContext, host)(ctx, "tcp", addr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("pixiv: client: ECH 自举连接 %s 失败: %w", host, err)
 	}
-	resp, err := probeTransport.RoundTrip(req)
-	if resp != nil {
-		resp.Body.Close()
-	}
-	return retryConfigsFromHandshake(err)
+	conn := tls.Client(rawConn, probeTLS)
+	defer conn.Close()
+	return retryConfigsFromHandshake(conn.HandshakeContext(ctx))
 }
 
 // retryConfigsFromHandshake 从握手结果中取出服务端下发的 retry_configs。

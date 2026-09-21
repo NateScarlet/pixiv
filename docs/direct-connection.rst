@@ -244,14 +244,7 @@ DoH 端点的支持情况
 .. code-block:: go
 
     // 直连施加 ECH：这正是 ECH 的用途，绕开按 SNI 的封锁。
-    // 不要经代理跑 ECH——代理本身已经绕过了封锁，那样验证不出 ECH 是否生效。
     direct := client.New(client.WithTransport(client.NewECHTransport(&http.Transport{})))
-
-    // 与代理组合也是支持的：底层传输带代理时，请求经代理发出且 ECH 仍然生效。
-    // 但这验证的是「叠加不破坏既有管道」，不是 ECH 的作用。
-    viaProxy := client.New(client.WithTransport(client.NewECHTransport(&http.Transport{
-        Proxy: http.ProxyURL(proxyURL),
-    })))
 
     // 由调用者提供配置（例如已有可靠的配置分发渠道）。
     withConfig := client.New(client.WithTransport(client.NewECHTransport(
@@ -270,6 +263,10 @@ DoH 端点的支持情况
 
 要点：
 
+- **ECH 主机的数据连接不走代理**，即使底层传输设置了代理（含 ``HTTPS_PROXY``
+  环境变量）也是直连。原因是 ECH 的意义就在于直连时绕开按 SNI 的封锁：
+  经代理时封锁本就被代理绕过，ECH 不再有意义。只有这些主机的数据连接绕开代理，
+  调用者自己的传输仍是原样，其他主机照常使用代理。
 - **适用范围是托管在 Cloudflare 的主机**。对不在 Cloudflare 之后的主机
   （如 ``i.pximg.net``），其证书与 ECH 的外层名不匹配，ECH 不适用。
   原语不做主机分派：由了解自身环境的调用者决定何时用它。
@@ -280,7 +277,7 @@ DoH 端点的支持情况
   原语用它重试并记住新配置，不需要重启或外部文件。服务端明确拒绝且未下发配置时
   返回错误，不静默退回明文握手。
 - **不使用 ``DialTLSContext``**。标准库文档明确它只对 non-proxied 请求生效，
-  存在代理时被静默忽略；原语用 ``TLSClientConfig`` 施加 ECH，故能与代理共存。
+  存在代理时被静默忽略；原语用 ``TLSClientConfig`` 施加 ECH。
 - **自行提供静态配置意味着承担轮换**：若配置过期而服务端又不下发新配置，
   连接会持续失败。
 - 经由本库默认客户端使用时，自举同样走请求上下文中的解析器，

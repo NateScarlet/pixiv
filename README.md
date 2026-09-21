@@ -74,7 +74,7 @@ routed := client.New(client.WithTransport(client.NewRoutedTransport(&http.Transp
 
 // 需要单独控制时, 也可以只用 ECH 原语 (外层 SNI 为 cloudflare-ech.com)。
 // 未提供配置时原语自行取得, 配置轮换时自行恢复; 不适用于 pixiv 自有源站。
-// 注意: ECH 的用途是直连时绕开按 SNI 的封锁, 不要经代理用它。
+// ECH 主机的数据连接始终直连, 即使这里配置了代理也不会经它发出。
 ech := client.New(client.WithTransport(client.NewECHTransport(&http.Transport{})))
 
 // 直连时若系统解析返回被污染的地址, 配合可用的 DoH 解析器。
