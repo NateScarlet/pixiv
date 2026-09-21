@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.8.2](https://github.com/NateScarlet/pixiv/compare/v0.8.1...v0.8.2) (2026-09-21)
+
+
+### Features
+
+* add pixiv-doctor connectivity probe command ([59529af](https://github.com/NateScarlet/pixiv/commit/59529af0a64496bb2f51d031308ccb02559fc07e))
+
+
+### Bug Fixes
+
+* **client:** should not send ECH traffic through a proxy ([a6e9fbe](https://github.com/NateScarlet/pixiv/commit/a6e9fbe7cb098a9d0307a900d8a1456ab33b20ef))
+* **client:** should route hosts without owning the transports ([9caea0f](https://github.com/NateScarlet/pixiv/commit/9caea0fad2b9ac3225d9d1dc20be1b61ac21e104))
+* **client:** should tell an explicit proxy from an inherited one ([4f787ae](https://github.com/NateScarlet/pixiv/commit/4f787ae7be99b12ef070392dee09507d19ba9b31))
+
 ## [0.8.1](https://github.com/NateScarlet/pixiv/compare/v0.8.0...v0.8.1) (2026-09-20)
 
 
