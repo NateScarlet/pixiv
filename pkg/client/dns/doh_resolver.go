@@ -17,6 +17,15 @@ type DOHResolver interface {
 
 type dohResolver struct {
 	url string
+	// client 发出查询请求；nil 时使用 http.DefaultClient（遵循进程代理环境变量）。
+	client *http.Client
+}
+
+func (r *dohResolver) httpClient() *http.Client {
+	if r.client == nil {
+		return http.DefaultClient
+	}
+	return r.client
 }
 
 // Resolve implements DNSResolver
@@ -36,7 +45,7 @@ func (r *dohResolver) Resolve(ctx context.Context, name string) (ip []net.IP, er
 	req.URL.RawQuery = q.Encode()
 	req.Header.Set("Accept", "application/dns-json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := r.httpClient().Do(req)
 	if err != nil {
 		return
 	}
@@ -63,5 +72,15 @@ func (r *dohResolver) URL() string {
 }
 
 func NewDOHResolver(url string) DOHResolver {
-	return &dohResolver{url}
+	return &dohResolver{url: url, client: nil}
+}
+
+// NewDOHResolverWithClient 用指定的 HTTP client 构造 DoH 解析器。
+//
+// 运行时用 [NewDOHResolver] 即可：其查询经 http.DefaultClient 发出，
+// 遵循进程代理环境变量（HTTPS_PROXY 等）。需要受控代理行为的调用者
+// （例如诊断工具对照「经代理 / 直连」两种查询路径）用本构造函数注入
+// 自己的 client；注入的 client 零值字段按标准库默认处理。
+func NewDOHResolverWithClient(url string, client *http.Client) DOHResolver {
+	return &dohResolver{url: url, client: client}
 }
