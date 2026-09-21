@@ -438,27 +438,53 @@ func TestECHTransportBypassesProxy(t *testing.T) {
 	assert.Equal(t, echTestPublicName, es.seenOuterSNI()[0], "服务端在解密前应只看到外层名")
 }
 
-// TestECHTransportBypassesProxyFromEnv 断言经 HTTPS_PROXY 环境变量提供的代理
-// 同样不影响 ECH 主机：defaultBaseTransport 克隆自 http.DefaultTransport，
-// 其 Proxy 默认为 ProxyFromEnvironment，因此这是最常见的实际情形。
-func TestECHTransportBypassesProxyFromEnv(t *testing.T) {
+// TestECHTransportBypassesEnvironmentProxy 断言底层传输从环境变量取得代理时，
+// ECH 主机的数据仍然直连。
+//
+// 这里不用 HTTPS_PROXY 环境变量驱动：net/http 的代理判断有进程级缓存
+// （envProxyFunc 用 sync.Once 只读一次环境），同一测试二进制内先跑到的用例
+// 会把结果固化，使环境变量在后续用例中失效——那样的断言会随执行顺序时真时假。
+// 改为给传输一个与 ProxyFromEnvironment 等价的代理函数，行为相同但不受缓存影响。
+func TestECHTransportBypassesEnvironmentProxy(t *testing.T) {
 	es := newECHTestServer(t, true)
 	deadProxy := newECHTestProxy(t, "127.0.0.1:1")
-	t.Setenv("HTTPS_PROXY", deadProxy.url)
-	t.Setenv("HTTP_PROXY", deadProxy.url)
+	proxyURL, err := url.Parse(deadProxy.url)
+	require.NoError(t, err)
 
-	base := defaultBaseTransport()
-	require.NotNil(t, base.Proxy, "本用例的前提是底层传输默认会读取代理环境变量")
-	base.TLSClientConfig = es.newServerTLS()
-	base.DialContext = dialToAddr(es.addr)
+	base := es.transport()
+	// 等价的「按环境选择代理」：本用例里环境固定为指向一个不转发到服务端的代理。
+	base.Proxy = func(*http.Request) (*url.URL, error) { return proxyURL, nil }
+
+	var seen echObserved
+	observing(base, &seen)
 	rt := NewECHTransport(base, WithECHConfigList(echTestServerConfigList(t, es)))
 
 	resp, err := (&http.Client{Transport: rt}).Get("https://" + echTestRealHost + "/")
-	require.NoError(t, err, "设置了 HTTPS_PROXY 时 ECH 数据仍应直连")
+	require.NoError(t, err, "底层传输会选用代理时，ECH 数据仍应直连")
 	defer resp.Body.Close()
 	io.Copy(io.Discard, resp.Body)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Zero(t, deadProxy.connects.Load(), "ECH 主机的请求不应经代理发出")
+	assert.True(t, seen.accepted, "直连时 ECH 应真正生效")
+}
+
+// TestDefaultBaseTransportReadsProxyEnvironment 断言 defaultBaseTransport 的
+// 代理函数确实来自环境变量，因此上面那条「绕开代理」的保证对真实部署成立。
+//
+// 只断言两者是同一行为（同一函数），不断言当前环境是否真的有代理——
+// 后者受 net/http 的进程级缓存影响，不适合作为测试前提。
+func TestDefaultBaseTransportReadsProxyEnvironment(t *testing.T) {
+	base := defaultBaseTransport()
+	require.NotNil(t, base.Proxy, "默认传输应带有代理判断")
+
+	// 默认传输的代理函数与 ProxyFromEnvironment 对同一请求给出一致结果。
+	req, err := http.NewRequest(http.MethodGet, "https://example.com/", nil)
+	require.NoError(t, err)
+	got, err := base.Proxy(req)
+	require.NoError(t, err)
+	want, err := http.ProxyFromEnvironment(req)
+	require.NoError(t, err)
+	assert.Equal(t, want, got, "默认传输应采用环境变量决定的代理")
 }
 
 // TestECHTransportKeepsCallerProxySettings 断言原语不改变调用者底层传输的代理设置：
