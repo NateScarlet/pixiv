@@ -45,3 +45,18 @@ func TestDOHResolverUsesInjectedClient(t *testing.T) {
 	}
 	assert.Equal(t, []string{"210.140.139.129"}, got)
 }
+
+// TestDOHResolverResolvesOwnProxyViaSystem 断言解析「自身访问链路上的代理地址」时
+// 使用系统解析，避免递归：DoH 查询本身要经该代理出网，若再经 DoH 解析代理名，
+// 就是「代理可达以 DoH 可用为前提、DoH 可用又以代理可达为前提」的自举死锁。
+//
+// 场景还原：HTTPS_PROXY 指向主机名形式的本地代理，无 SNI 传输的解析接缝
+// 会把代理地址交给解析器。本用例直接从解析器语义层钉住：解析该代理名时
+// 不发出 DoH 查询，而是走系统解析——端点故意指向不可达地址也不会被触及。
+func TestDOHResolverResolvesOwnProxyViaSystem(t *testing.T) {
+	t.Setenv("HTTPS_PROXY", "http://localhost:7890")
+	r := NewDOHResolverWithClient("http://127.0.0.1:1/dns-query", &http.Client{})
+	ip, err := r.Resolve(context.Background(), "localhost")
+	require.NoError(t, err)
+	assert.NotEmpty(t, ip, "应回落系统解析得到结果")
+}

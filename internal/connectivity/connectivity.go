@@ -217,15 +217,10 @@ func (r Report) dataProxyClause() string {
 }
 
 // Render 把报告渲染为面向人的文本。
-//
-// 探测错误中可能出现的代理地址会被脱敏：报告常被截图分享，
-// 代理地址可能含内网主机名或个人跳板域名；用户自己设置的代理原值
-// 已在报告头部展示，无需从错误文本中重复获得。
 func Render(w io.Writer, r Report) error {
 	if _, err := fmt.Fprintf(w, "pixiv 连通性检测\n"); err != nil {
 		return err
 	}
-	proxies := []*url.URL{r.Env.ProxyURL}
 	if _, err := fmt.Fprintf(w, "环境: %s\n", r.Env.GoVersion); err != nil {
 		return err
 	}
@@ -258,7 +253,7 @@ func Render(w io.Writer, r Report) error {
 		return err
 	}
 	for _, c := range r.Checks {
-		if err := renderCheck(w, c, proxies); err != nil {
+		if err := renderCheck(w, c); err != nil {
 			return err
 		}
 	}
@@ -293,11 +288,11 @@ func autoTransportState(r Report) string {
 	}
 }
 
-// renderCheck 渲染一条探测记录，错误文本经代理地址脱敏。
-func renderCheck(w io.Writer, c Check, proxies []*url.URL) error {
+// renderCheck 渲染一条探测记录，错误原样呈现——报告是给用户自己看的诊断输出。
+func renderCheck(w io.Writer, c Check) error {
 	mark, state := "[ok]  ", "成功"
 	if !c.OK() {
-		mark, state = "[失败]", fmt.Sprintf("失败: %s", redactProxyHosts(c.Err.Error(), proxies...))
+		mark, state = "[失败]", fmt.Sprintf("失败: %s", c.Err.Error())
 	}
 	detail := c.Detail
 	if detail != "" {
@@ -305,18 +300,4 @@ func renderCheck(w io.Writer, c Check, proxies []*url.URL) error {
 	}
 	_, err := fmt.Fprintf(w, "%s %s%s → %s\n", mark, c.Name, detail, state)
 	return err
-}
-
-// redactProxyHosts 把文本中出现的代理地址替换为占位符。
-func redactProxyHosts(s string, proxies ...*url.URL) string {
-	for _, u := range proxies {
-		if u == nil || u.Host == "" {
-			continue
-		}
-		s = strings.ReplaceAll(s, u.Host, "<代理地址>")
-		if hostname := u.Hostname(); hostname != "" && hostname != u.Host {
-			s = strings.ReplaceAll(s, hostname, "<代理地址>")
-		}
-	}
-	return s
 }
