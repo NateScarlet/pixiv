@@ -18,21 +18,6 @@ import (
 // 因此默认值不应被改动；仅当目标使用其他 ECH 提供方时才需要通过选项指定。
 const ECHDefaultPublicName = "cloudflare-ech.com"
 
-// echHostnames 列出托管在 Cloudflare、可经 ECH 直连的主机。
-//
-// 与 noSNIHostnames 一样属于库掌握的 pixiv 主机布局知识，不对外暴露为选项。
-//
-// 这些主机按 SNI 封锁，且服务端已不接受 SNI 与 Host 不匹配的请求
-// （见 docs/direct-connection.rst）。ECH 把真实域名加密在内层，
-// 中间设备只能看到外层名，因此直连可用。
-//
-// 只列出确实托管在 Cloudflare 的主机：ECH 只对这类主机适用，对不在
-// Cloudflare 之后的主机（如 i.pximg.net）其证书与 ECH 外层名不匹配。
-var echHostnames = map[string]struct{}{
-	"www.pixiv.net":     {},
-	"app-api.pixiv.net": {},
-}
-
 // ECHOption 描述构造 ECH 传输原语的一项设置。
 //
 // 与 [Option] 一样是带未导出方法的接口，从而封闭实现集合，

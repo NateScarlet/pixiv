@@ -26,26 +26,15 @@ type AutoTransport struct {
 
 // RoundTrip implements http.RoundTripper
 func (t *AutoTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	t.once.Do(func() {
-		var implicit bool
-		t.base = t.Base
-		if t.base == nil {
-			// 调用者未提供底层传输：base 由本库自建，其代理来自进程环境变量
-			// （http.DefaultTransport 的 Proxy 是 ProxyFromEnvironment）。
-			// 那不是调用者的意图，只是环境泄漏，故 ECH 路由可忽略它。
-			implicit = true
-			t.base = defaultBaseTransport()
-		}
-		t.routed = newRoutedTransport(t.base, implicit)
-	})
-	resp, err := t.routed.RoundTrip(req)
+	t.once.Do(t.setup)
+	var resp, err = t.routed.RoundTrip(req)
 	// body 无法重建的请求不可原样重发（body 已被首次尝试消费），失败直接向上传播；
 	// 其余请求在首选方式不可用时继续尝试其余方式。
 	if err == nil || (req.Body != nil && req.GetBody == nil) {
 		return resp, err
 	}
 	if !hasRoutedWay(req.URL.Hostname()) {
-		// 该主机没有特殊方式，路由传输用的就是 base，重试没有意义。
+		// 该主机没有特殊方式，用的就是 base，重试没有意义。
 		return resp, err
 	}
 	// 保存首选方式的错误，用于全部失败时聚合呈现。
@@ -71,11 +60,34 @@ func (t *AutoTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, errors.Join(routedErr, err)
 }
 
+// setup 依据调用者提供的 Base 装配路由，只发生一次。
+func (t *AutoTransport) setup() {
+	var implicit bool
+	t.base = t.Base
+	if t.base == nil {
+		// 调用者未提供底层传输：base 由本库自建，其代理来自进程环境变量
+		// （http.DefaultTransport 的 Proxy 是 ProxyFromEnvironment）。
+		// 那不是调用者的意图，只是环境泄漏，故 ECH 路由可忽略它。
+		implicit = true
+		t.base = defaultBaseTransport()
+	}
+	if b, ok := t.base.(*http.Transport); ok {
+		// 未列入清单的主机仍走 base：api 通道叠加了 ECH，而 ECH 只适用于托管在
+		// Cloudflare 的 pixiv 主机，对调用者指定的其他地址（例如镜像）不适用。
+		t.routed = newRoutedTransportWithFallback(
+			t.base, newECHTransportState(b, implicit), NewNoSNITransport(b))
+		return
+	}
+	// base 不是 *http.Transport：ECH 与不发送 SNI 都只能由 TLSClientConfig 表达，
+	// 库不去猜测调用者传输的语义，所有主机都按它的常规方式访问。
+	t.routed = t.base
+}
+
 // hasRoutedWay 报告该主机是否配有针对性的特殊连接方式。
 func hasRoutedWay(host string) bool {
-	if _, ok := noSNIHostnames[host]; ok {
+	if _, ok := apiHostnames[host]; ok {
 		return true
 	}
-	_, ok := echHostnames[host]
+	_, ok := imageHostnames[host]
 	return ok
 }

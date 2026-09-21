@@ -137,7 +137,7 @@ SNI 阻断机制
 不发送 SNI 的实现与失效范围
 --------------------------------
 
-本节说明 ``pkg/client/transport.go`` 中不发送 SNI 的实现，以及为何它只对 ``i.pximg.net`` 仍然有效。
+本节说明 ``pkg/client/transport_no_sni.go`` 中不发送 SNI 的实现，以及为何它只对 ``i.pximg.net`` 仍然有效。
 
 机制依赖两点配合：
 
@@ -152,8 +152,14 @@ SNI 阻断机制
 
 ``NewRoutedTransport`` 持有「哪些主机该用哪种方式」的清单，目前有两类：
 ``i.pximg.net`` 走不发送 SNI 的方式；``www.pixiv.net`` 与 ``app-api.pixiv.net``
-托管在 Cloudflare，走 ECH 直连。``AutoTransport`` 在此之上做自动选择，
-对这两类主机都会在首选方式失败时回落到常规连接，``DefaultTransport`` 默认为它。
+托管在 Cloudflare，走 ECH 直连。两个通道由调用者提供，路由只负责分派，不代为
+构造传输；``AutoTransport`` 用它在 ``Base`` 之上装配出默认管道，对这两类主机都会
+在首选方式失败时回落到常规连接，``DefaultTransport`` 默认为它。
+
+不发送 SNI 的握手不含主机名，标准库因此无法按主机名校验证书；而握手阶段也拿不到
+目标主机名（``DialContext`` 的目标只到拨号为止，``DialTLSContext`` 虽能拿到却在经
+代理时被静默忽略，故不使用）。这一步因此由路由层在收到响应后按实际协商出的证书
+补齐：它知道请求主机，证书不匹配时请求报错，而不是把响应交给调用者。
 
 因此默认配置下，对托管在 Cloudflare 的 API 主机是**经 ECH 直连**的，
 不需要调用者额外配置。若该途径在当前网络下不可用（例如中间设备对外层名
@@ -277,6 +283,9 @@ DoH 端点的支持情况
 - **适用范围是托管在 Cloudflare 的主机**。对不在 Cloudflare 之后的主机
   （如 ``i.pximg.net``），其证书与 ECH 的外层名不匹配，ECH 不适用。
   原语不做主机分派：由了解自身环境的调用者决定何时用它。
+- **同一份配置对任意 Cloudflare 主机都适用**（见上文「ECH」一节：配置由
+  Cloudflare 全网共享），因此多个 Cloudflare 主机可以共用同一个原语实例，
+  自举与配置轮换只发生一次，不需要按主机各建一份。
 - **外层名固定为 ``cloudflare-ech.com``**（可用 ``WithECHPublicName`` 覆盖，
   但仅当目标使用其它 ECH 提供方时才需要）。该名字写在 ECHConfig 的
   ``public_name`` 字段内，由配置携带，不由原语另行设置。

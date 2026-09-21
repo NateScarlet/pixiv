@@ -15,15 +15,6 @@ import (
 // 只对 non-proxied 请求生效，经代理时会被静默忽略，故不使用它。
 const noSNIServerName = "0.0.0.0"
 
-// noSNIHostnames 列出需要不发送 SNI 才能取回内容的主机。
-//
-// 这是本库掌握的 pixiv 主机布局知识，不对外暴露为选项：调用者无法观测
-// pixiv 侧的变化，做成配置等于把一个无法完成的任务转嫁出去。
-var noSNIHostnames = map[string]struct{}{
-	// Pixiv 自有源站，接受不携带 SNI 的握手，配合 Referer 即可取图。
-	"i.pximg.net": {},
-}
-
 // NewNoSNITransport 返回一个不发送 SNI 的传输原语：在 base 之上叠加
 // 「握手时不携带 SNI」这一种连接能力。
 //
@@ -31,16 +22,12 @@ var noSNIHostnames = map[string]struct{}{
 // 若需要「按主机自动选用」，用 [NewRoutedTransport]。
 //
 // 不发送 SNI 后标准库无法自动按主机名校验证书，因此本原语改为自行校验证书链。
-// 由于原语不知道目标主机名，单独使用时只校验证书链；由 [NewRoutedTransport]
-// 使用时还会校验证书主机名。需要更严格的校验时，调用者可在返回的传输上
-// 自行设置 VerifyPeerCertificate。
+// 由于原语不知道目标主机名，它只校验证书链；主机名校验需要知道请求主机，
+// 由 [NewRoutedTransport] 在收到响应后补齐。
+// 需要更严格的校验时，调用者可在返回的传输上自行设置 VerifyPeerCertificate。
 //
 // 返回的传输克隆自 base，因此可与其他原语嵌套组合，且不改变调用者的 base。
 func NewNoSNITransport(base *http.Transport) *http.Transport {
-	return newNoSNITransport(base, "")
-}
-
-func newNoSNITransport(base *http.Transport, host string) *http.Transport {
 	if base == nil {
 		base = defaultBaseTransport()
 	}
@@ -56,12 +43,14 @@ func newNoSNITransport(base *http.Transport, host string) *http.Transport {
 		cfg.InsecureSkipVerify = true
 		// 调用者原有的校验回调仍然生效，叠加而非替换，以便组合时不丢失调用者的要求。
 		cfg.VerifyPeerCertificate = chainVerifyPeerCertificate(
-			verifyPeerCertificate(host, cfg.RootCAs),
+			verifyPeerCertificate(cfg.RootCAs),
 			cfg.VerifyPeerCertificate,
 		)
 	}
 	t.TLSClientConfig = cfg
-	t.DialContext = resolverDialContext(t.DialContext, host)
+	// 主机名留空：拨号目标即请求主机，因此经代理时拨号的是代理地址、
+	// 由代理解析目标主机，而解析器只解析真正的目标主机。
+	t.DialContext = resolverDialContext(t.DialContext, "")
 	return t
 }
 
@@ -80,21 +69,16 @@ func chainVerifyPeerCertificate(
 	}
 }
 
-// verifyPeerCertificate 校验服务器证书链，并在已知主机名时校验主机名。
+// verifyPeerCertificate 校验证书链。
 //
 // 这是 InsecureSkipVerify 的替代校验：不发送 SNI 时标准库无法自动完成这一步。
-func verifyPeerCertificate(host string, roots *x509.CertPool) func([][]byte, [][]*x509.Certificate) error {
+// 主机名不在这里校验：握手阶段拿不到目标主机名（拨号目标只到拨号为止），
+// 需要主机名的校验由 [verifyResponseHostname] 在收到响应后补齐。
+func verifyPeerCertificate(roots *x509.CertPool) func([][]byte, [][]*x509.Certificate) error {
 	return func(rawCerts [][]byte, _ [][]*x509.Certificate) error {
-		if len(rawCerts) == 0 {
-			return errors.New("pixiv: client: 服务器未提供证书")
-		}
-		var certs = make([]*x509.Certificate, len(rawCerts))
-		for i, raw := range rawCerts {
-			var cert, err = x509.ParseCertificate(raw)
-			if err != nil {
-				return fmt.Errorf("pixiv: client: 无法解析服务器证书: %w", err)
-			}
-			certs[i] = cert
+		var certs, err = parsePeerCertificates(rawCerts)
+		if err != nil {
+			return err
 		}
 		var opts = x509.VerifyOptions{
 			Roots:         roots,
@@ -106,12 +90,42 @@ func verifyPeerCertificate(host string, roots *x509.CertPool) func([][]byte, [][
 		if _, err := certs[0].Verify(opts); err != nil {
 			return fmt.Errorf("pixiv: client: 服务器证书不可信: %w", err)
 		}
-		if host == "" {
-			return nil
-		}
-		if err := certs[0].VerifyHostname(host); err != nil {
-			return fmt.Errorf("pixiv: client: 服务器证书与主机 %s 不匹配: %w", host, err)
-		}
 		return nil
 	}
+}
+
+// verifyResponseHostname 用响应中实际协商出的证书校验主机名。
+//
+// 不发送 SNI 时标准库无法自动完成这一步，而握手阶段又拿不到目标主机名，
+// 因此由知道请求主机的路由层在收到响应后校验：校验不通过说明连接的对端
+// 并非该主机，响应内容不可信，应报错而不是把它交给调用者。
+func verifyResponseHostname(resp *http.Response, host string) error {
+	if resp.TLS == nil {
+		// 请求未经 TLS（例如测试用的明文端点），没有证书可校验。
+		return nil
+	}
+	var certs = resp.TLS.PeerCertificates
+	if len(certs) == 0 {
+		return errors.New("pixiv: client: 服务器未提供证书")
+	}
+	if err := certs[0].VerifyHostname(host); err != nil {
+		return fmt.Errorf("pixiv: client: 服务器证书与主机 %s 不匹配: %w", host, err)
+	}
+	return nil
+}
+
+// parsePeerCertificates 把握手得到的原始证书解析为证书链。
+func parsePeerCertificates(rawCerts [][]byte) ([]*x509.Certificate, error) {
+	if len(rawCerts) == 0 {
+		return nil, errors.New("pixiv: client: 服务器未提供证书")
+	}
+	var certs = make([]*x509.Certificate, len(rawCerts))
+	for i, raw := range rawCerts {
+		var cert, err = x509.ParseCertificate(raw)
+		if err != nil {
+			return nil, fmt.Errorf("pixiv: client: 无法解析服务器证书: %w", err)
+		}
+		certs[i] = cert
+	}
+	return certs, nil
 }
