@@ -67,14 +67,18 @@ noSNI := client.New(client.WithTransport(client.NewNoSNITransport(&http.Transpor
 })))
 
 // 或者让库按主机自动选用合适的方式 (主机清单由库持有, 随依赖升级更新)。
+// 两个通道由你提供, 因此可以各自带上自己的拨号、代理与 DNS 设置。
 // 默认传输即为它: 托管在 Cloudflare 的 API 主机会经 ECH 直连, 失败时回落。
-routed := client.New(client.WithTransport(client.NewRoutedTransport(&http.Transport{
-    Proxy: http.ProxyURL(proxyURL),
-})))
+routed := client.New(client.WithTransport(client.NewRoutedTransport(
+    // API 主机 (www.pixiv.net 等): 经 ECH 直连, 因此不能带代理。
+    client.NewECHTransport(&http.Transport{}),
+    // 图片主机 (i.pximg.net): 不发送 SNI, 可以经代理。
+    client.NewNoSNITransport(&http.Transport{Proxy: http.ProxyURL(proxyURL)}),
+)))
 
 // 需要单独控制时, 也可以只用 ECH 原语 (外层 SNI 为 cloudflare-ech.com)。
 // 未提供配置时原语自行取得, 配置轮换时自行恢复; 不适用于 pixiv 自有源站。
-// 注意: ECH 的用途是直连时绕开按 SNI 的封锁, 不要经代理用它。
+// ECH 依赖直连: 未指定代理时会忽略环境变量里的代理; 显式指定代理则报错说明冲突。
 ech := client.New(client.WithTransport(client.NewECHTransport(&http.Transport{})))
 
 // 直连时若系统解析返回被污染的地址, 配合可用的 DoH 解析器。

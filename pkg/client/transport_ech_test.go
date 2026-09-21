@@ -129,10 +129,18 @@ func (es *echTestServer) transport() *http.Transport {
 func dialingTo(addr string, tlsCfg *tls.Config) *http.Transport {
 	return &http.Transport{
 		TLSClientConfig: tlsCfg,
-		DialContext: func(ctx context.Context, network, _ string) (net.Conn, error) {
-			var d net.Dialer
-			return d.DialContext(ctx, network, addr)
-		},
+		DialContext:     dialToAddr(addr),
+	}
+}
+
+// dialToAddr 返回把任何拨号目标都指向 addr 的拨号函数。
+//
+// 它用来把请求导到本地测试服务端，同时保留请求中的真实主机名，
+// 使 TLS 的 SNI 与证书校验行为与真实场景一致。
+func dialToAddr(addr string) func(ctx context.Context, network, addr string) (net.Conn, error) {
+	return func(ctx context.Context, network, _ string) (net.Conn, error) {
+		var d net.Dialer
+		return d.DialContext(ctx, network, addr)
 	}
 }
 
@@ -462,33 +470,96 @@ func TestECHTransportDoesNotMutateBase(t *testing.T) {
 	assert.Nil(t, base.TLSClientConfig.EncryptedClientHelloRejectionVerify)
 }
 
-// TestECHTransportComposesWithProxy 断言原语与代理可组合：
-// 请求经代理发出，且 ECH 仍然生效。
-func TestECHTransportComposesWithProxy(t *testing.T) {
+// TestECHTransportErrorsOnExplicitProxy 断言调用者显式指定代理时快速失败。
+//
+// 调用者显式设置代理是明确的意图，库不去绕开它；但 ECH 依赖直连才能绕开按 SNI
+// 的封锁，两者无法同时满足。此时必须报错说明冲突，而不是静默改用普通连接
+// （那会让调用者以为 ECH 生效了）或给出含糊的握手错误。
+func TestECHTransportErrorsOnExplicitProxy(t *testing.T) {
 	es := newECHTestServer(t, true)
-	proxy := newECHTestProxy(t, es.addr)
-	proxyURL, err := url.Parse(proxy.url)
+	deadProxy := newECHTestProxy(t, "127.0.0.1:1")
+	proxyURL, err := url.Parse(deadProxy.url)
 	require.NoError(t, err)
 
-	// 经代理时不能劫持拨号：拨号目标是代理地址，由代理建立到目标主机的隧道。
-	// 因此这里用真实拨号，让请求按 example.com:443 发起 CONNECT。
-	base := &http.Transport{
-		TLSClientConfig: es.newServerTLS(),
-		Proxy:           http.ProxyURL(proxyURL),
-	}
-	var seen echObserved
-	observing(base, &seen)
+	base := es.transport()
+	base.Proxy = http.ProxyURL(proxyURL)
 	rt := NewECHTransport(base, WithECHConfigList(echTestServerConfigList(t, es)))
 
-	resp, err := (&http.Client{Transport: rt}).Get("https://" + echTestRealHost + "/")
+	_, err = (&http.Client{Transport: rt}).Get("https://" + echTestRealHost + "/")
+	require.Error(t, err, "显式代理与 ECH 冲突时应报错")
+	assert.Contains(t, err.Error(), "ECH")
+	assert.Contains(t, err.Error(), "代理")
+	assert.Zero(t, deadProxy.connects.Load(), "报错应发生在发起连接之前")
+}
+
+// TestECHTransportIgnoresImplicitProxy 断言 base 由库自建时，其环境变量带来的
+// 代理被忽略，ECH 主机直连。
+//
+// 这种代理不是调用者的意图：它只是环境泄漏，最常见的情形是调用者为了让 DoH
+// 能出网而设了 HTTPS_PROXY（dns 包的 DoH 走 http.DefaultClient）。
+// 若因此让 pixiv 数据也走代理，ECH 就失去了意义。
+func TestECHTransportIgnoresImplicitProxy(t *testing.T) {
+	es := newECHTestServer(t, true)
+	deadProxy := newECHTestProxy(t, "127.0.0.1:1")
+	proxyURL, err := url.Parse(deadProxy.url)
 	require.NoError(t, err)
+
+	base := es.transport()
+	base.Proxy = func(*http.Request) (*url.URL, error) { return proxyURL, nil }
+
+	var seen echObserved
+	observing(base, &seen)
+	// implicit=true：等价于 AutoTransport 自建 base 的情形。
+	rt := newECHTransportState(base, true, WithECHConfigList(echTestServerConfigList(t, es)))
+
+	resp, err := (&http.Client{Transport: rt}).Get("https://" + echTestRealHost + "/")
+	require.NoError(t, err, "隐式代理应被忽略，ECH 数据直连")
 	defer resp.Body.Close()
 	io.Copy(io.Discard, resp.Body)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Zero(t, deadProxy.connects.Load(), "ECH 主机的请求不应经代理发出")
+	assert.True(t, seen.accepted, "直连时 ECH 应真正生效")
+	assert.Equal(t, echTestPublicName, es.seenOuterSNI()[0], "服务端在解密前应只看到外层名")
+}
 
-	assert.NotZero(t, proxy.connects.Load(), "请求应经代理发出")
-	assert.True(t, seen.accepted, "经代理时 ECH 仍应生效")
-	assert.Equal(t, echTestPublicName, es.seenOuterSNI()[0])
+// TestDefaultBaseTransportReadsProxyEnvironment 断言 defaultBaseTransport 的
+// 代理函数确实来自环境变量，因此上面那条「绕开代理」的保证对真实部署成立。
+//
+// 只断言两者是同一行为（同一函数），不断言当前环境是否真的有代理——
+// 后者受 net/http 的进程级缓存影响，不适合作为测试前提。
+func TestDefaultBaseTransportReadsProxyEnvironment(t *testing.T) {
+	base := defaultBaseTransport()
+	require.NotNil(t, base.Proxy, "默认传输应带有代理判断")
+
+	// 默认传输的代理函数与 ProxyFromEnvironment 对同一请求给出一致结果。
+	req, err := http.NewRequest(http.MethodGet, "https://example.com/", nil)
+	require.NoError(t, err)
+	got, err := base.Proxy(req)
+	require.NoError(t, err)
+	want, err := http.ProxyFromEnvironment(req)
+	require.NoError(t, err)
+	assert.Equal(t, want, got, "默认传输应采用环境变量决定的代理")
+}
+
+// TestECHTransportKeepsCallerProxySettings 断言原语不改变调用者底层传输的代理设置：
+// 只有 ECH 主机的数据连接绕开代理，调用者自己的传输仍是原样。
+func TestECHTransportKeepsCallerProxySettings(t *testing.T) {
+	proxyURL, err := url.Parse("http://127.0.0.1:7890")
+	require.NoError(t, err)
+	base := defaultBaseTransport()
+	base.Proxy = http.ProxyURL(proxyURL)
+
+	_ = NewECHTransport(base, WithECHConfigList(echTestForeignConfigList(t)))
+
+	require.NotNil(t, base.Proxy, "不应清空调用者传输的代理设置")
+	// 对照：普通传输仍然经代理，说明绕开代理只针对 ECH 主机。
+	probe := defaultBaseTransport()
+	probe.Proxy = http.ProxyURL(proxyURL)
+	req, err := http.NewRequest(http.MethodGet, "https://example.com/", nil)
+	require.NoError(t, err)
+	got, err := probe.Proxy(req)
+	require.NoError(t, err)
+	assert.Equal(t, proxyURL.String(), got.String(), "普通传输仍应使用代理")
 }
 
 // TestECHTransportNilBase 断言未提供基础传输时使用进程默认传输。

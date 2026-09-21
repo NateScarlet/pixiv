@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -32,14 +33,16 @@ func okResponse(req *http.Request) *http.Response {
 	}
 }
 
-// newRoutedTransportWithRoutes 是测试专用的路由构造，用于注入任意主机清单，
+// newRoutedTransportWithRoutes 是测试专用的路由构造，用于注入任意主机清单与通道，
 // 从而可以在断言路由行为时不断言库持有的真实清单内容。
-func newRoutedTransportWithRoutes(base http.RoundTripper, routes map[string]http.RoundTripper) *routedTransport {
-	return &routedTransport{base: base, routes: routes}
+//
+// 未列入清单的主机交给 api，与 [NewRoutedTransport] 一致。
+func newRoutedTransportWithRoutes(api http.RoundTripper, routes map[string]route) *routedTransport {
+	return &routedTransport{fallback: api, routes: routes}
 }
 
 // TestRoutedTransportSendsHostToMatchingTransport 断言请求到达适合该主机的
-// 传输，其他主机仍走基础传输。
+// 通道，其他主机仍走 api（api 兼作默认通道）。
 func TestRoutedTransportSendsHostToMatchingTransport(t *testing.T) {
 	var special, base int32
 	baseRT := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
@@ -50,8 +53,8 @@ func TestRoutedTransportSendsHostToMatchingTransport(t *testing.T) {
 		atomic.AddInt32(&special, 1)
 		return okResponse(req), nil
 	})
-	rt := newRoutedTransportWithRoutes(baseRT, map[string]http.RoundTripper{
-		"special.example.com": specialRT,
+	rt := newRoutedTransportWithRoutes(baseRT, map[string]route{
+		"special.example.com": {rt: specialRT},
 	})
 
 	req, err := http.NewRequest(http.MethodGet, "https://special.example.com/a", nil)
@@ -67,7 +70,7 @@ func TestRoutedTransportSendsHostToMatchingTransport(t *testing.T) {
 	resp, err = rt.RoundTrip(req)
 	require.NoError(t, err)
 	defer resp.Body.Close()
-	assert.Equal(t, int32(1), atomic.LoadInt32(&special), "其他主机不应触发特殊传输")
+	assert.Equal(t, int32(1), atomic.LoadInt32(&special), "其他主机不应触发特殊通道")
 	assert.Equal(t, int32(1), atomic.LoadInt32(&base))
 }
 
@@ -82,7 +85,7 @@ func TestRoutedTransportRewritesHTTPRedirect(t *testing.T) {
 	})
 	rt := newRoutedTransportWithRoutes(
 		roundTripperFunc(func(req *http.Request) (*http.Response, error) { return okResponse(req), nil }),
-		map[string]http.RoundTripper{"special.example.com": redirect},
+		map[string]route{"special.example.com": {rt: redirect}},
 	)
 	req, err := http.NewRequest(http.MethodGet, "https://special.example.com/a", nil)
 	require.NoError(t, err)
@@ -101,7 +104,7 @@ func TestRoutedTransportKeepsHTTPSRedirect(t *testing.T) {
 	})
 	rt := newRoutedTransportWithRoutes(
 		roundTripperFunc(func(req *http.Request) (*http.Response, error) { return okResponse(req), nil }),
-		map[string]http.RoundTripper{"special.example.com": redirect},
+		map[string]route{"special.example.com": {rt: redirect}},
 	)
 	req, err := http.NewRequest(http.MethodGet, "https://special.example.com/a", nil)
 	require.NoError(t, err)
@@ -111,32 +114,104 @@ func TestRoutedTransportKeepsHTTPSRedirect(t *testing.T) {
 	assert.Equal(t, "https://special.example.com/next", resp.Header.Get("Location"))
 }
 
-// TestNewRoutedTransportAppliesECHToCloudflareHost 断言路由到清单内主机的传输
-// 确实施加 ECH，且该能力在真实握手下生效。
+// TestNewRoutedTransportRoutesHostsByChannel 断言路由把库持有的两类主机
+// 分派到调用者提供的两个通道，未列出的主机交给 api（api 兼作默认通道）。
 //
-// 分两步：结构上断言清单内的主机被路由到 ECH 传输；行为上用一个与清单等价的
-// 注入路由，把请求指向本地 ECH 服务端，断言 ECH 被真正接受。
-func TestNewRoutedTransportAppliesECHToCloudflareHost(t *testing.T) {
-	// 结构与库持有的真实清单一致：清单内的主机各有专门的传输。
-	rt := NewRoutedTransport(defaultBaseTransport())
+// 断言的是路由行为本身，因此用可辨认的替身传输；库持有的真实清单内容由
+// TestRoutedTransportHostListsCoverBothWays 断言。
+func TestNewRoutedTransportRoutesHostsByChannel(t *testing.T) {
+	var api, image http.RoundTripper = &spyTransport{}, &spyTransport{}
+	rt := NewRoutedTransport(api, image)
 	rs, ok := rt.(*routedTransport)
 	require.True(t, ok)
-	for host := range echHostnames {
-		route, routed := rs.routes[host]
-		require.True(t, routed, "主机 %s 应有专门的传输", host)
-		_, isECH := route.(*echTransport)
-		assert.True(t, isECH, "主机 %s 应被路由到 ECH 传输", host)
+
+	for host := range apiHostnames {
+		assert.Equal(t, api, rs.routes[host].rt, "主机 %s 应走 api 通道", host)
+	}
+	for host := range imageHostnames {
+		assert.Equal(t, image, rs.routes[host].rt, "主机 %s 应走 image 通道", host)
+		assert.True(t, rs.routes[host].noSNI, "图片通道不发送 SNI，主机名校验需由路由补齐")
 	}
 
-	// 行为：同样的路由方式下 ECH 真正生效。
+	// 未列入清单的主机交给 api，即 api 兼作默认通道。
+	assert.Equal(t, api, rs.fallback, "未列入清单的主机应交给 api 通道")
+}
+
+// TestNewRoutedTransportRequiresBothTransports 断言缺少通道时快速失败：
+// 两个通道都是必需依赖，库不代为构造。
+func TestNewRoutedTransportRequiresBothTransports(t *testing.T) {
+	assert.Panics(t, func() { NewRoutedTransport(nil, &spyTransport{}) })
+	assert.Panics(t, func() { NewRoutedTransport(&spyTransport{}, nil) })
+}
+
+// TestRoutedTransportHostListsCoverBothWays 断言库持有的清单确实覆盖了两类
+// 接入方式，且两者不重叠——同一主机不能既走 ECH 又走不发送 SNI。
+func TestRoutedTransportHostListsCoverBothWays(t *testing.T) {
+	assert.Contains(t, apiHostnames, "www.pixiv.net")
+	assert.Contains(t, apiHostnames, "app-api.pixiv.net")
+	assert.Contains(t, imageHostnames, "i.pximg.net")
+	for host := range apiHostnames {
+		assert.NotContains(t, imageHostnames, host, "主机 %s 不应同时属于两类", host)
+	}
+}
+
+// TestAutoTransportSharesOneECHTransport 断言 AutoTransport 为所有 API 主机
+// 共用同一份 ECH 传输。
+//
+// ECH 配置由 Cloudflare 全网共享，同一份配置对任意 Cloudflare 主机都适用，
+// 因此按主机各建一份既无必要（自举会重复发生、配置轮换要各自处理），
+// 也会让图片主机被误施 ECH——它不在 Cloudflare 之后。
+func TestAutoTransportSharesOneECHTransport(t *testing.T) {
+	rt := &AutoTransport{Base: defaultBaseTransport()}
+	rt.setup()
+	rs, ok := rt.routed.(*routedTransport)
+	require.True(t, ok)
+
+	var first http.RoundTripper
+	for host := range apiHostnames {
+		route, routed := rs.routes[host]
+		require.True(t, routed, "主机 %s 应被路由", host)
+		_, isECH := route.rt.(*echTransport)
+		require.True(t, isECH, "主机 %s 应走 ECH 通道，实际 %T", host, route.rt)
+		if first == nil {
+			first = route.rt
+			continue
+		}
+		assert.Same(t, first, route.rt, "所有 API 主机应共用同一份 ECH 传输")
+	}
+
+	// 图片主机走不发送 SNI 的方式，且不是 ECH 传输。
+	var imageRoute http.RoundTripper
+	for host := range imageHostnames {
+		route, routed := rs.routes[host]
+		require.True(t, routed, "主机 %s 应被路由", host)
+		_, isECH := route.rt.(*echTransport)
+		assert.False(t, isECH, "图片主机不在 Cloudflare 之后，不应施加 ECH")
+		assert.True(t, route.noSNI, "图片通道不发送 SNI，主机名校验需由路由补齐")
+		imageRoute = route.rt
+	}
+	// 图片通道与 API 通道是两份不同的传输：它们需要不同的连接方式。
+	assert.NotSame(t, first, imageRoute, "两个通道不应共用同一份传输")
+
+	// 未列入清单的主机走 base，而不是叠加了 ECH 的 API 通道：
+	// 调用者指定的镜像地址不在 Cloudflare 之后。
+	assert.Same(t, rt.base, rs.fallback)
+}
+
+// TestNewRoutedTransportAppliesECHToCloudflareHost 断言 API 通道上的 ECH
+// 在真实握手下生效。
+func TestNewRoutedTransportAppliesECHToCloudflareHost(t *testing.T) {
 	server := newECHTestServer(t, true)
 	base := server.transport()
 	var seen echObserved
 	observing(base, &seen)
-	injected := newRoutedTransportWithRoutes(base, map[string]http.RoundTripper{
-		// 注入路由用测试服务端发布的外层名，使外层 SNI 断言可与服务端观测对上。
-		echTestRealHost: NewECHTransport(base, WithECHPublicName(echTestPublicName)),
-	})
+	injected := newRoutedTransportWithRoutes(
+		NewECHTransport(base, WithECHPublicName(echTestPublicName)),
+		map[string]route{
+			// 注入路由用测试服务端发布的外层名，使外层 SNI 断言可与服务端观测对上。
+			echTestRealHost: {rt: NewECHTransport(base, WithECHPublicName(echTestPublicName))},
+		},
+	)
 
 	resp, err := (&http.Client{Transport: injected}).Get("https://" + echTestRealHost + "/")
 	require.NoError(t, err)
@@ -148,36 +223,42 @@ func TestNewRoutedTransportAppliesECHToCloudflareHost(t *testing.T) {
 		"服务端在解密前应只看到外层名")
 }
 
-// TestNewRoutedTransportSkipsECHForInapplicableHosts 断言不适用 ECH 的主机不被
-// 施加 ECH：它们不在 Cloudflare 之后。
-func TestNewRoutedTransportSkipsECHForInapplicableHosts(t *testing.T) {
-	rt := NewRoutedTransport(defaultBaseTransport())
-	rs, ok := rt.(*routedTransport)
-	require.True(t, ok)
+// TestRoutedTransportVerifiesImageHostname 断言不发送 SNI 的图片通道由路由层
+// 补齐主机名校验：证书与该主机不匹配时请求失败，而不是把响应交给调用者。
+//
+// 不发送 SNI 后标准库无法自动校验证书主机名，而握手阶段拿不到目标主机名，
+// 因此这一步只能发生在路由层——它知道请求主机。
+func TestRoutedTransportVerifiesImageHostname(t *testing.T) {
+	// 请求主机不在服务端证书的覆盖范围内（证书覆盖 example.com 与 127.0.0.1）。
+	var serverName atomic.Value
+	base, rawURL := testTLSServer(t, "sni-probe.invalid", &serverName)
 
-	for _, host := range []string{"i.pximg.net", "example.com"} {
-		if route, routed := rs.routes[host]; routed {
-			_, isECH := route.(*echTransport)
-			assert.False(t, isECH, "主机 %s 不在 Cloudflare 之后，不应被施加 ECH", host)
-		}
-	}
+	rt := newRoutedTransportWithRoutes(
+		NewNoSNITransport(base),
+		map[string]route{"sni-probe.invalid": {rt: NewNoSNITransport(base), noSNI: true}},
+	)
+
+	_, err := (&http.Client{Transport: rt}).Get(rawURL)
+	require.Error(t, err, "证书与请求主机不匹配时应报错")
+	assert.Contains(t, err.Error(), "sni-probe.invalid", "错误应指明不匹配的主机")
 }
 
-// TestRoutedTransportRoutesECHHostsToECHTransport 断言清单内的主机确实被路由到
-// 带 ECH 的传输，而不是常规传输。
-func TestRoutedTransportRoutesECHHostsToECHTransport(t *testing.T) {
-	base := defaultBaseTransport()
-	rt := newRoutedTransport(base)
+// TestRoutedTransportAcceptsMatchingImageHostname 断言证书与请求主机匹配时
+// 图片通道的响应正常返回：上一条用例的断言确实区分了两种行为。
+func TestRoutedTransportAcceptsMatchingImageHostname(t *testing.T) {
+	var serverName atomic.Value
+	base, rawURL := testTLSServer(t, "example.com", &serverName)
 
-	for host := range echHostnames {
-		route, ok := rt.routes[host]
-		require.True(t, ok, "主机 %s 应有专门的传输", host)
-		_, isECH := route.(*echTransport)
-		assert.True(t, isECH, "主机 %s 应被路由到 ECH 传输，实际 %T", host, route)
-	}
-	// 不适用 ECH 的主机仍走不发送 SNI 的方式。
-	_, ok := rt.routes["i.pximg.net"]
-	assert.True(t, ok, "i.pximg.net 应保留不发送 SNI 的方式")
+	rt := newRoutedTransportWithRoutes(
+		NewNoSNITransport(base),
+		map[string]route{"example.com": {rt: NewNoSNITransport(base), noSNI: true}},
+	)
+
+	resp, err := (&http.Client{Transport: rt}).Get(rawURL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "", serverName.Load(), "图片通道仍不应发送 SNI")
 }
 
 // TestHasRoutedWay 断言只有确有特殊方式的主机才需要回落重试。
@@ -193,6 +274,61 @@ func TestHasRoutedWay(t *testing.T) {
 	}
 }
 
+// TestAutoTransportTreatsCallerBaseAsExplicit 断言调用者提供 Base 时，
+// 其代理被当作明确意图：ECH 主机因代理无法直连，报错而不是悄悄改走普通连接。
+func TestAutoTransportTreatsCallerBaseAsExplicit(t *testing.T) {
+	es := newECHTestServer(t, true)
+	deadProxy := newECHTestProxy(t, "127.0.0.1:1")
+	proxyURL, err := url.Parse(deadProxy.url)
+	require.NoError(t, err)
+
+	base := es.transport()
+	base.Proxy = http.ProxyURL(proxyURL)
+	rt := &AutoTransport{Base: base}
+
+	_, err = (&http.Client{Transport: rt}).Get("https://www.pixiv.net/")
+	require.Error(t, err, "显式代理与 ECH 冲突时应报错")
+	assert.Contains(t, err.Error(), "ECH")
+	assert.Zero(t, deadProxy.connects.Load(), "不应先去尝试代理")
+}
+
+// TestAutoTransportTreatsSelfBuiltBaseAsImplicit 断言 Base 未设置（由库自建）时，
+// 继承自环境变量的代理被忽略：ECH 主机直连，不报错。
+//
+// 该代理不是调用者的意图，只是环境泄漏（例如为让 DoH 出网而设的 HTTPS_PROXY）。
+func TestAutoTransportTreatsSelfBuiltBaseAsImplicit(t *testing.T) {
+	es := newECHTestServer(t, true)
+	deadProxy := newECHTestProxy(t, "127.0.0.1:1")
+	proxyURL, err := url.Parse(deadProxy.url)
+	require.NoError(t, err)
+
+	// 模拟「库自建 base，且该 base 带有环境变量带来的代理」。
+	base := es.transport()
+	base.Proxy = func(*http.Request) (*url.URL, error) { return proxyURL, nil }
+	// 拨号仍指向测试服务端，且请求使用测试证书覆盖的主机名，
+	// 从而只观察「代理是否被忽略」，不受证书主机名影响。
+	rt := &AutoTransport{Base: base}
+	// 直接构造 routed 以复用注入的 base，同时保持 implicit=true 的语义。
+	rt.once.Do(func() {
+		rt.base = base
+		rt.routed = newRoutedTransportWithRoutes(
+			newECHTransportState(base, true,
+				WithECHConfigList(echTestServerConfigList(t, es)),
+				WithECHPublicName(echTestPublicName)),
+			map[string]route{echTestRealHost: {rt: newECHTransportState(base, true,
+				WithECHConfigList(echTestServerConfigList(t, es)),
+				WithECHPublicName(echTestPublicName))}},
+		)
+	})
+
+	resp, err := (&http.Client{Transport: rt}).Get("https://" + echTestRealHost + "/")
+	require.NoError(t, err, "库自建 base 的隐式代理应被忽略，ECH 主机直连")
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Zero(t, deadProxy.connects.Load(), "ECH 主机的请求不应经代理发出")
+}
+
 // TestAutoTransportFallsBackForECHHost 断言 ECH 不可用时自动选择仍能让请求成功：
 // ECH 只在部分主机与网络环境下可用，失败后应回落常规连接。
 func TestAutoTransportFallsBackForECHHost(t *testing.T) {
@@ -205,10 +341,10 @@ func TestAutoTransportFallsBackForECHHost(t *testing.T) {
 	// 让 ECH 方式必然失败，观察最终结果。
 	rt.once.Do(func() {
 		rt.base = base
-		rt.routed = newRoutedTransportWithRoutes(base, map[string]http.RoundTripper{
-			"www.pixiv.net": roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		rt.routed = newRoutedTransportWithRoutes(base, map[string]route{
+			"www.pixiv.net": {rt: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 				return nil, errors.New("stub: ECH 不可用")
-			}),
+			})},
 		})
 	})
 
@@ -237,14 +373,15 @@ func TestAutoTransportSkipsRetryForPlainHost(t *testing.T) {
 	assert.Equal(t, int32(1), atomic.LoadInt32(&baseCalls), "无特殊方式的主机不应重试")
 }
 
-// TestNewRoutedTransportWithPlainRoundTripper 断言基础传输不是 *http.Transport
+// TestNewRoutedTransportWithPlainRoundTripper 断言两个通道都不是 *http.Transport
 // 时公开入口仍可用，请求照常发出。
 func TestNewRoutedTransportWithPlainRoundTripper(t *testing.T) {
 	var count int32
-	rt := NewRoutedTransport(roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+	plain := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 		atomic.AddInt32(&count, 1)
 		return okResponse(req), nil
-	}))
+	})
+	rt := NewRoutedTransport(plain, plain)
 	req, err := http.NewRequest(http.MethodGet, "https://i.pximg.net/x.png", nil)
 	require.NoError(t, err)
 	resp, err := rt.RoundTrip(req)
@@ -254,15 +391,13 @@ func TestNewRoutedTransportWithPlainRoundTripper(t *testing.T) {
 	assert.Equal(t, int32(1), atomic.LoadInt32(&count))
 }
 
-// TestNewRoutedTransportNilBase 断言未提供基础传输时也能工作。
-func TestNewRoutedTransportNilBase(t *testing.T) {
-	assert.NotNil(t, NewRoutedTransport(nil))
-}
-
 // testTLSServer 启动一个本地 TLS 服务端，并返回一个把指定主机名拨到该
 // 服务端的传输。请求因此使用真实主机名（而非 IP 字面量），TLS 的 SNI
 // 行为才与真实场景一致——IP 字面量本身就不会产生 SNI 扩展。
-func testTLSServer(t *testing.T, serverName *atomic.Value) (base *http.Transport, rawURL string) {
+//
+// 请求主机名由 host 指定：服务端的自签证书覆盖 example.com，因此需要
+// 校验通过的用例传该名字，需要观察「证书与主机不匹配」的用例传其他名字。
+func testTLSServer(t *testing.T, host string, serverName *atomic.Value) (base *http.Transport, rawURL string) {
 	t.Helper()
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -285,17 +420,20 @@ func testTLSServer(t *testing.T, serverName *atomic.Value) (base *http.Transport
 		var d net.Dialer
 		return d.DialContext(ctx, network, addr)
 	}
-	// 两个用例只关心 SNI 是否发送，因此跳过证书校验：真实主机名与本地
-	// 服务端的自签证书并不匹配，校验会先于本次断言的目标失败。
+	// 只关心 SNI 与证书主机名的处理，因此跳过标准库的证书校验：本地服务端的
+	// 自签证书不在系统根证书里，否则校验会先于本次断言的目标失败。
+	// 证书链与主机名由 NewNoSNITransport 叠加的校验负责（见 transport_no_sni.go）。
 	base.TLSClientConfig.InsecureSkipVerify = true
-	return base, "https://sni-probe.invalid/"
+	base.TLSClientConfig.RootCAs = x509.NewCertPool()
+	base.TLSClientConfig.RootCAs.AddCert(server.Certificate())
+	return base, "https://" + host + "/"
 }
 
 // TestTransportPrimitivesCompose 断言原语嵌套后请求按预期经过各层：
 // 经两层无 SNI 原语发出的请求仍能完成握手，且服务端观测不到 SNI。
 func TestTransportPrimitivesCompose(t *testing.T) {
 	var serverName atomic.Value
-	base, rawURL := testTLSServer(t, &serverName)
+	base, rawURL := testTLSServer(t, "example.com", &serverName)
 
 	client := &http.Client{Transport: NewNoSNITransport(NewNoSNITransport(base))}
 	resp, err := client.Get(rawURL)
@@ -309,7 +447,7 @@ func TestTransportPrimitivesCompose(t *testing.T) {
 // 本地 TLS 服务端能够观测到客户端未提供 SNI。
 func TestNewNoSNITransportSuppressesSNI(t *testing.T) {
 	var serverName atomic.Value
-	base, rawURL := testTLSServer(t, &serverName)
+	base, rawURL := testTLSServer(t, "example.com", &serverName)
 
 	client := &http.Client{Transport: NewNoSNITransport(base)}
 	resp, err := client.Get(rawURL)
@@ -323,7 +461,7 @@ func TestNewNoSNITransportSuppressesSNI(t *testing.T) {
 // 以确认上一个用例的断言确实区分了两种行为。
 func TestDefaultTransportBaselineSendsSNI(t *testing.T) {
 	var serverName atomic.Value
-	base, rawURL := testTLSServer(t, &serverName)
+	base, rawURL := testTLSServer(t, "example.com", &serverName)
 
 	client := &http.Client{Transport: base}
 	resp, err := client.Get(rawURL)
@@ -420,11 +558,13 @@ func TestNewNoSNITransportVerifiesCertificateChain(t *testing.T) {
 	require.Error(t, err, "自签证书不应通过校验")
 
 	// 放入该服务端的根证书后应能通过，说明校验确实按证书链进行。
+	// 主机名不在这里校验（原语不知道目标主机名），由路由层在收到响应后补齐，
+	// 见 TestRoutedTransportVerifiesImageHostname。
 	pool := x509.NewCertPool()
 	pool.AddCert(server.Certificate())
 	rt = NewNoSNITransport(defaultBaseTransport())
 	rt.TLSClientConfig.RootCAs = pool
-	rt.TLSClientConfig.VerifyPeerCertificate = verifyPeerCertificate("", pool)
+	rt.TLSClientConfig.VerifyPeerCertificate = verifyPeerCertificate(pool)
 	client = &http.Client{Transport: rt}
 	resp, err := client.Get(server.URL)
 	require.NoError(t, err)
@@ -443,10 +583,10 @@ func TestAutoTransportAggregatesErrorsWhenAllWaysFail(t *testing.T) {
 	// 让受特殊处理的主机的首选方式也必然失败，迫使两种方式全部尝试。
 	rt.once.Do(func() {
 		rt.base = rt.Base
-		rt.routed = newRoutedTransportWithRoutes(rt.Base, map[string]http.RoundTripper{
-			"i.pximg.net": roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		rt.routed = newRoutedTransportWithRoutes(rt.Base, map[string]route{
+			"i.pximg.net": {rt: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 				return nil, errors.New("stub: 特殊方式不可用")
-			}),
+			})},
 		})
 	})
 	req, err := http.NewRequest(http.MethodGet, "https://i.pximg.net/x.png", nil)
@@ -483,10 +623,10 @@ func TestAutoTransportContinuesToOtherWays(t *testing.T) {
 	// 让受特殊处理的主机的首选方式必然失败，观察最终结果。
 	rt.once.Do(func() {
 		rt.base = base
-		rt.routed = newRoutedTransportWithRoutes(base, map[string]http.RoundTripper{
-			"i.pximg.net": roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		rt.routed = newRoutedTransportWithRoutes(base, map[string]route{
+			"i.pximg.net": {rt: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 				return nil, errors.New("stub: 特殊方式不可用")
-			}),
+			})},
 		})
 	})
 

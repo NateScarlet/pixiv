@@ -11,7 +11,7 @@ docs: docs/* docs/_build/html/.git
 	$(MAKE) -C docs html
 
 test:
-	go test ./pkg/...
+	go test ./...
 
 deploy-docs: docs
 	cd docs/_build/html ; git add --all && git commit --amend -m 'docs: build' -m '[skip ci]' && git push -f

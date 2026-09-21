@@ -81,15 +81,24 @@ func WithECHPublicName(name string) ECHOption {
 // retry_configs，本传输用它重试并记住新配置，因此不需要重启或外部定时任务。
 // 服务端明确拒绝且未下发配置时返回错误，不静默退回明文握手。
 //
-// # 与代理组合
+// # 与代理的关系
+//
+// ECH 的意义是直连时绕开按 SNI 的封锁，因此本传输的数据连接不走代理；
+// 但代理的来源决定处理方式：
+//
+//   - base 由本库自建时（[AutoTransport] 未设置 Base），其代理只来自进程环境
+//     变量，不是调用者的意图，故被忽略，请求直连。常见情形是调用者为了让 DoH
+//     能出网而设了 HTTPS_PROXY。
+//   - 调用者显式提供 base 时，其中的代理是明确的指令。经代理发出就依赖不了
+//     直连，ECH 无法生效，此时请求返回错误说明该冲突，而不是静默改用普通连接
+//     ——静默降级会让调用者以为 ECH 生效了。
+//
+// 直接构造本传输（[NewECHTransport]）等同于后者：调用者既然传入了 base，
+// 其中的代理即视为显式指定。
 //
 // 需要 TLS 1.3。本传输不使用 DialTLSContext：标准库文档明确后者只对 non-proxied
-// 请求生效，存在代理时被静默忽略，能力不生效且无任何提示。TLSClientConfig
-// 可与代理共存，代理由 base 自理，因此本传输可与代理叠加使用。
-//
-// 需要注意用途：ECH 的意义在于**直连**时绕开按 SNI 的封锁。经代理发起请求时
-// 封锁本就被代理绕过，ECH 不增加价值；支持与代理组合是为了让本原语能叠加在
-// 调用者既有的管道上，而不是建议这么用。
+// 请求生效，存在代理时被静默忽略，能力不生效且无任何提示。TLSClientConfig 承载
+// ECH，直连所需的拨号能力由 base 提供。
 //
 // 返回的传输不改变调用者的 base，因此可与其他原语嵌套组合。
 //
@@ -97,7 +106,8 @@ func WithECHPublicName(name string) ECHOption {
 // 都发生在运行时，而 EncryptedClientHelloConfigList 是每 *http.Transport 一份、
 // 无法按请求切换的字段，必须换用一份带新配置的传输才能表达，故以包装型实现。
 func NewECHTransport(base *http.Transport, opts ...ECHOption) http.RoundTripper {
-	return newECHTransportState(base, opts...)
+	// 调用者显式提供 base，其中的代理是明确的意图，不予忽略。
+	return newECHTransportState(base, false, opts...)
 }
 
 // echTransport 是 ECH 传输的实现：它持有一份可更换配置的底层 Transport。
@@ -109,6 +119,13 @@ type echTransport struct {
 	// base 提供拨号、代理与其余 TLS 设置；克隆自调用者的传输。
 	base *http.Transport
 
+	// implicitProxy 表示 base 由本库自建，其代理仅来自进程环境变量。
+	//
+	// 此时该代理不是调用者的意图，只是环境泄漏（例如仅为让 DoH 能出网而设的
+	// HTTPS_PROXY），故 ECH 主机忽略它。调用者显式提供的代理则相反：
+	// 那是明确的指令，必须尊重，此时 ECH 无法直连，快速失败而不是静默降级。
+	implicitProxy bool
+
 	publicName string
 
 	mu         sync.Mutex
@@ -119,7 +136,10 @@ type echTransport struct {
 }
 
 // newECHTransportState 依据选项构造 ECH 传输内部状态。
-func newECHTransportState(base *http.Transport, opts ...ECHOption) *echTransport {
+//
+// implicitProxy 表示 base 由本库自建（其代理只来自环境变量），
+// 见 [echTransport.implicitProxy]。
+func newECHTransportState(base *http.Transport, implicitProxy bool, opts ...ECHOption) *echTransport {
 	var cfg echConfig
 	for _, o := range opts {
 		if o == nil {
@@ -132,11 +152,13 @@ func newECHTransportState(base *http.Transport, opts ...ECHOption) *echTransport
 	}
 	if base == nil {
 		base = defaultBaseTransport()
+		implicitProxy = true
 	}
 	t := &echTransport{
-		base:       base.Clone(),
-		publicName: cfg.publicName,
-		configList: cfg.configList,
+		base:          base.Clone(),
+		implicitProxy: implicitProxy,
+		publicName:    cfg.publicName,
+		configList:    cfg.configList,
 	}
 	// 无论是否已有配置都先建好活跃传输：未提供配置时它不带 ECH 字段，
 	// 取到配置后再换用带配置的一份。
@@ -176,6 +198,15 @@ func (t *echTransport) transportWith(configList []byte) *http.Transport {
 	// 与单独使用 NewNoSNITransport 的语义一致。经代理时拨号的是代理地址，
 	// 解析交由代理完成。
 	out.DialContext = resolverDialContext(out.DialContext, "")
+	// 代理的处理取决于它的来源：
+	//
+	//  - 隐式（base 由本库自建）：其代理只来自进程环境变量，不是调用者的意图，
+	//    而 ECH 的意义正是直连绕开按 SNI 的封锁，因此忽略它。
+	//  - 显式（调用者提供了 base）：代理是明确的指令，必须尊重，故原样保留；
+	//    此时 ECH 无法直连，由 [echTransport.RoundTrip] 快速失败而不是静默降级。
+	if t.implicitProxy {
+		out.Proxy = nil
+	}
 	return out
 }
 
@@ -207,10 +238,34 @@ func (t *echTransport) getConfig() []byte {
 	return t.configList
 }
 
+// usesProxy 报告该请求是否会经实际使用的传输的代理发出。
+//
+// 判断依据是当前活跃传输（即请求真正要走的那个），而不是构造时的 base：
+// 两者在隐式代理的情形下不同——活跃传输的代理已被清空。
+func (t *echTransport) usesProxy(req *http.Request) bool {
+	active := t.current()
+	if active.Proxy == nil {
+		return false
+	}
+	proxyURL, err := active.Proxy(req)
+	// 代理函数出错时按「不走代理」处理：让请求正常发出，
+	// 由底层传输自己报告代理配置的问题。
+	return err == nil && proxyURL != nil
+}
+
 // RoundTrip implements http.RoundTripper
 //
 // 首次使用时若尚无配置则先自行取得；之后请求交给当前配置对应的传输。
 func (t *echTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	// 调用者显式指定了代理时，请求会经代理发出，而 ECH 依赖直连才能绕开
+	// 按 SNI 的封锁。此时继续下去只会得到一次无谓的失败，故明确报错，
+	// 使调用者知道自己指定的代理与 ECH 冲突，而不是看到含糊的握手错误。
+	if !t.implicitProxy && t.usesProxy(req) {
+		return nil, fmt.Errorf(
+			"pixiv: client: 主机 %s 需要直连才能使用 ECH，但底层传输指定了代理；"+
+				"请为该主机去掉代理，或改用其它传输方式", req.URL.Hostname())
+	}
+
 	// 尚无配置：先取得再发出请求。取得途径是 TLS 握手自举，不需要 DNS。
 	// 并发的首批请求共用同一次取得，避免各自发起一次握手。
 	if err := t.ensureConfig(req.Context(), req.URL.Hostname(), req.URL.Port()); err != nil {
@@ -296,50 +351,25 @@ func verifyECHOuterCert(cs tls.ConnectionState, publicName string, roots *x509.C
 	return nil
 }
 
-// bootstrapConn 建立一条用于自举的连接。
-//
-// 它直接复用底层传输的拨号与代理处理：把 probeTLS 挂在一份克隆的传输上，
-// 用 net/http 自己的代理与 CONNECT 实现去连接，因此不重复实现代理协商与认证。
-//
 // bootstrapHandshake 用给定配置发起一次自举握手，并返回服务端下发的 retry_configs。
 //
-// 它复用底层传输的代理与解析设置：不经代理时经注入的解析器解析目标主机；
-// 经代理时由 net/http 自身完成 CONNECT 协商与认证，本包不重复实现。
+// 自举与数据连接走同一条直连路径，不使用代理：它取回的配置正是给直连用的，
+// 经代理取的配置与直连时的实际行为不对应。
+// 调用者显式指定代理的情形已由 [echTransport.RoundTrip] 提前拦下，到不了这里。
+//
+// 目标主机名经请求上下文中注入的解析器解析（见 [resolverDialContext]）：
+// 系统解析可能返回被污染的地址，自举不应假设它可用。
 func (t *echTransport) bootstrapHandshake(
 	ctx context.Context, host, port string, probeTLS *tls.Config,
 ) ([]byte, error) {
 	addr := net.JoinHostPort(host, port)
-
-	if t.base.Proxy == nil {
-		// 与不发送 SNI 的原语走同一条解析接缝：解析器由请求上下文注入，
-		// 未注入时回落到底层拨号函数（即系统解析）。
-		rawConn, err := resolverDialContext(t.base.DialContext, host)(ctx, "tcp", addr)
-		if err != nil {
-			return nil, err
-		}
-		conn := tls.Client(rawConn, probeTLS)
-		defer conn.Close()
-		return retryConfigsFromHandshake(conn.HandshakeContext(ctx))
-	}
-
-	// 经代理时借底层传输自身的代理能力建立隧道。
-	probeTransport := t.base.Clone()
-	probeTransport.TLSClientConfig = probeTLS
-	probeTransport.ForceAttemptHTTP2 = false
-	if probeTransport.TLSClientConfig.NextProtos == nil {
-		probeTransport.TLSClientConfig.NextProtos = []string{"http/1.1"}
-	}
-	// 用一次请求驱动握手：请求不会真正发出，因为自举配置必然被服务端拒绝，
-	// 握手会在写出任何 HTTP 报文之前以 ECHRejectionError 结束。
-	req, err := http.NewRequestWithContext(ctx, http.MethodHead, "https://"+addr+"/", nil)
+	rawConn, err := resolverDialContext(t.base.DialContext, host)(ctx, "tcp", addr)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("pixiv: client: ECH 自举连接 %s 失败: %w", host, err)
 	}
-	resp, err := probeTransport.RoundTrip(req)
-	if resp != nil {
-		resp.Body.Close()
-	}
-	return retryConfigsFromHandshake(err)
+	conn := tls.Client(rawConn, probeTLS)
+	defer conn.Close()
+	return retryConfigsFromHandshake(conn.HandshakeContext(ctx))
 }
 
 // retryConfigsFromHandshake 从握手结果中取出服务端下发的 retry_configs。

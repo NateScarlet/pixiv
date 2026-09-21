@@ -207,10 +207,10 @@ func TestGetBodyRequestFallsBack(t *testing.T) {
 	rt := &AutoTransport{Base: base}
 	rt.once.Do(func() {
 		rt.base = base
-		rt.routed = newRoutedTransportWithRoutes(base, map[string]http.RoundTripper{
-			"i.pximg.net": roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		rt.routed = newRoutedTransportWithRoutes(base, map[string]route{
+			"i.pximg.net": {rt: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 				return nil, errors.New("stub: 特殊方式不可用")
-			}),
+			})},
 		})
 	})
 
