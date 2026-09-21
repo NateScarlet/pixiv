@@ -411,61 +411,56 @@ func TestECHTransportDoesNotMutateBase(t *testing.T) {
 	assert.Nil(t, base.TLSClientConfig.EncryptedClientHelloRejectionVerify)
 }
 
-// TestECHTransportBypassesProxy 断言即使底层传输配置了代理，ECH 的数据连接仍然直连。
+// TestECHTransportErrorsOnExplicitProxy 断言调用者显式指定代理时快速失败。
 //
-// ECH 的用途就是直连时绕开按 SNI 的封锁：经代理时封锁本就被代理绕过，
-// ECH 不再有意义，而且会让「ECH 是否生效」失去可观测性。
-// 这里用一个不转发到服务端的代理：若数据走了代理，请求必然失败。
-func TestECHTransportBypassesProxy(t *testing.T) {
-	es := newECHTestServer(t, true)
-	deadProxy := newECHTestProxy(t, "127.0.0.1:1")
-	proxyURL, err := url.Parse(deadProxy.url)
-	require.NoError(t, err)
-
-	base := es.transport() // 拨号指向测试服务端，直连可达
-	base.Proxy = http.ProxyURL(proxyURL)
-	var seen echObserved
-	observing(base, &seen)
-	rt := NewECHTransport(base, WithECHConfigList(echTestServerConfigList(t, es)))
-
-	resp, err := (&http.Client{Transport: rt}).Get("https://" + echTestRealHost + "/")
-	require.NoError(t, err, "数据应直连，不应被发往代理")
-	defer resp.Body.Close()
-	io.Copy(io.Discard, resp.Body)
-	assert.Equal(t, http.StatusOK, resp.StatusCode)
-	assert.Zero(t, deadProxy.connects.Load(), "ECH 主机的请求不应经代理发出")
-	assert.True(t, seen.accepted, "直连时 ECH 应真正生效")
-	assert.Equal(t, echTestPublicName, es.seenOuterSNI()[0], "服务端在解密前应只看到外层名")
-}
-
-// TestECHTransportBypassesEnvironmentProxy 断言底层传输从环境变量取得代理时，
-// ECH 主机的数据仍然直连。
-//
-// 这里不用 HTTPS_PROXY 环境变量驱动：net/http 的代理判断有进程级缓存
-// （envProxyFunc 用 sync.Once 只读一次环境），同一测试二进制内先跑到的用例
-// 会把结果固化，使环境变量在后续用例中失效——那样的断言会随执行顺序时真时假。
-// 改为给传输一个与 ProxyFromEnvironment 等价的代理函数，行为相同但不受缓存影响。
-func TestECHTransportBypassesEnvironmentProxy(t *testing.T) {
+// 调用者显式设置代理是明确的意图，库不去绕开它；但 ECH 依赖直连才能绕开按 SNI
+// 的封锁，两者无法同时满足。此时必须报错说明冲突，而不是静默改用普通连接
+// （那会让调用者以为 ECH 生效了）或给出含糊的握手错误。
+func TestECHTransportErrorsOnExplicitProxy(t *testing.T) {
 	es := newECHTestServer(t, true)
 	deadProxy := newECHTestProxy(t, "127.0.0.1:1")
 	proxyURL, err := url.Parse(deadProxy.url)
 	require.NoError(t, err)
 
 	base := es.transport()
-	// 等价的「按环境选择代理」：本用例里环境固定为指向一个不转发到服务端的代理。
+	base.Proxy = http.ProxyURL(proxyURL)
+	rt := NewECHTransport(base, WithECHConfigList(echTestServerConfigList(t, es)))
+
+	_, err = (&http.Client{Transport: rt}).Get("https://" + echTestRealHost + "/")
+	require.Error(t, err, "显式代理与 ECH 冲突时应报错")
+	assert.Contains(t, err.Error(), "ECH")
+	assert.Contains(t, err.Error(), "代理")
+	assert.Zero(t, deadProxy.connects.Load(), "报错应发生在发起连接之前")
+}
+
+// TestECHTransportIgnoresImplicitProxy 断言 base 由库自建时，其环境变量带来的
+// 代理被忽略，ECH 主机直连。
+//
+// 这种代理不是调用者的意图：它只是环境泄漏，最常见的情形是调用者为了让 DoH
+// 能出网而设了 HTTPS_PROXY（dns 包的 DoH 走 http.DefaultClient）。
+// 若因此让 pixiv 数据也走代理，ECH 就失去了意义。
+func TestECHTransportIgnoresImplicitProxy(t *testing.T) {
+	es := newECHTestServer(t, true)
+	deadProxy := newECHTestProxy(t, "127.0.0.1:1")
+	proxyURL, err := url.Parse(deadProxy.url)
+	require.NoError(t, err)
+
+	base := es.transport()
 	base.Proxy = func(*http.Request) (*url.URL, error) { return proxyURL, nil }
 
 	var seen echObserved
 	observing(base, &seen)
-	rt := NewECHTransport(base, WithECHConfigList(echTestServerConfigList(t, es)))
+	// implicit=true：等价于 AutoTransport 自建 base 的情形。
+	rt := newECHTransportState(base, true, WithECHConfigList(echTestServerConfigList(t, es)))
 
 	resp, err := (&http.Client{Transport: rt}).Get("https://" + echTestRealHost + "/")
-	require.NoError(t, err, "底层传输会选用代理时，ECH 数据仍应直连")
+	require.NoError(t, err, "隐式代理应被忽略，ECH 数据直连")
 	defer resp.Body.Close()
 	io.Copy(io.Discard, resp.Body)
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Zero(t, deadProxy.connects.Load(), "ECH 主机的请求不应经代理发出")
 	assert.True(t, seen.accepted, "直连时 ECH 应真正生效")
+	assert.Equal(t, echTestPublicName, es.seenOuterSNI()[0], "服务端在解密前应只看到外层名")
 }
 
 // TestDefaultBaseTransportReadsProxyEnvironment 断言 defaultBaseTransport 的

@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -167,7 +168,8 @@ func TestNewRoutedTransportSkipsECHForInapplicableHosts(t *testing.T) {
 // 带 ECH 的传输，而不是常规传输。
 func TestRoutedTransportRoutesECHHostsToECHTransport(t *testing.T) {
 	base := defaultBaseTransport()
-	rt := newRoutedTransport(base)
+	// 这里模拟调用者显式提供 base（代理应被尊重）。
+	rt := newRoutedTransport(base, false)
 
 	for host := range echHostnames {
 		route, ok := rt.routes[host]
@@ -191,6 +193,58 @@ func TestHasRoutedWay(t *testing.T) {
 	} {
 		assert.Equal(t, want, hasRoutedWay(host), "主机 %q", host)
 	}
+}
+
+// TestAutoTransportTreatsCallerBaseAsExplicit 断言调用者提供 Base 时，
+// 其代理被当作明确意图：ECH 主机因代理无法直连，报错而不是悄悄改走普通连接。
+func TestAutoTransportTreatsCallerBaseAsExplicit(t *testing.T) {
+	es := newECHTestServer(t, true)
+	deadProxy := newECHTestProxy(t, "127.0.0.1:1")
+	proxyURL, err := url.Parse(deadProxy.url)
+	require.NoError(t, err)
+
+	base := es.transport()
+	base.Proxy = http.ProxyURL(proxyURL)
+	rt := &AutoTransport{Base: base}
+
+	_, err = (&http.Client{Transport: rt}).Get("https://www.pixiv.net/")
+	require.Error(t, err, "显式代理与 ECH 冲突时应报错")
+	assert.Contains(t, err.Error(), "ECH")
+	assert.Zero(t, deadProxy.connects.Load(), "不应先去尝试代理")
+}
+
+// TestAutoTransportTreatsSelfBuiltBaseAsImplicit 断言 Base 未设置（由库自建）时，
+// 继承自环境变量的代理被忽略：ECH 主机直连，不报错。
+//
+// 该代理不是调用者的意图，只是环境泄漏（例如为让 DoH 出网而设的 HTTPS_PROXY）。
+func TestAutoTransportTreatsSelfBuiltBaseAsImplicit(t *testing.T) {
+	es := newECHTestServer(t, true)
+	deadProxy := newECHTestProxy(t, "127.0.0.1:1")
+	proxyURL, err := url.Parse(deadProxy.url)
+	require.NoError(t, err)
+
+	// 模拟「库自建 base，且该 base 带有环境变量带来的代理」。
+	base := es.transport()
+	base.Proxy = func(*http.Request) (*url.URL, error) { return proxyURL, nil }
+	// 拨号仍指向测试服务端，且请求使用测试证书覆盖的主机名，
+	// 从而只观察「代理是否被忽略」，不受证书主机名影响。
+	rt := &AutoTransport{Base: base}
+	// 直接构造 routed 以复用注入的 base，同时保持 implicit=true 的语义。
+	rt.once.Do(func() {
+		rt.base = base
+		rt.routed = newRoutedTransportWithRoutes(base, map[string]http.RoundTripper{
+			echTestRealHost: newECHTransportState(base, true,
+				WithECHConfigList(echTestServerConfigList(t, es)),
+				WithECHPublicName(echTestPublicName)),
+		})
+	})
+
+	resp, err := (&http.Client{Transport: rt}).Get("https://" + echTestRealHost + "/")
+	require.NoError(t, err, "库自建 base 的隐式代理应被忽略，ECH 主机直连")
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body)
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Zero(t, deadProxy.connects.Load(), "ECH 主机的请求不应经代理发出")
 }
 
 // TestAutoTransportFallsBackForECHHost 断言 ECH 不可用时自动选择仍能让请求成功：
