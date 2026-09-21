@@ -158,6 +158,9 @@ func New(opts ...Option) *Client {
 	return c
 }
 
+// DefaultDNSQueryURL 是未设置 PIXIV_DNS_QUERY_URL 时使用的默认 DoH 端点。
+const DefaultDNSQueryURL = defaultDNSQueryURL
+
 // defaultDNSResolver 返回环境变量播种的默认解析器，供本库自带的
 // 连接能力（例如图像主机的无 SNI 直连）解析目标主机。
 func defaultDNSResolver() dns.Resolver {
