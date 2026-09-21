@@ -42,6 +42,17 @@ type probeTask struct {
 	run    func(ctx context.Context) error
 }
 
+// recordDirectWay 把一种直连方式记入主机报告，同种方式（多台主机共享）
+// 只记录一次，避免结论句出现「ECH、ECH」。
+func recordDirectWay(h *HostReport, way string) {
+	for _, w := range h.DirectWays {
+		if w == way {
+			return
+		}
+	}
+	h.DirectWays = append(h.DirectWays, way)
+}
+
 // Run 执行全部探测并汇总报告。
 //
 // 探测相互独立、并行执行，单项失败（包括超时）不中止套件——诊断需要的
@@ -108,7 +119,7 @@ func (s Suite) Run(ctx context.Context, env Environment, p Prober) Report {
 				mu.Lock()
 				if err == nil {
 					rep.API.Direct = true
-					rep.API.DirectWays = append(rep.API.DirectWays, "ECH")
+					recordDirectWay(&rep.API, "ECH")
 				} else {
 					rep.API.DirectErrs = append(rep.API.DirectErrs, Check{Name: "API 主机 ECH 直连", Detail: h, Err: err})
 				}
@@ -123,7 +134,7 @@ func (s Suite) Run(ctx context.Context, env Environment, p Prober) Report {
 				mu.Lock()
 				if err == nil {
 					rep.API.Direct = true
-					rep.API.DirectWays = append(rep.API.DirectWays, "常规")
+					recordDirectWay(&rep.API, "常规")
 				} else {
 					rep.API.DirectErrs = append(rep.API.DirectErrs, Check{Name: "API 主机常规直连", Detail: h, Err: err})
 				}
@@ -140,7 +151,7 @@ func (s Suite) Run(ctx context.Context, env Environment, p Prober) Report {
 				mu.Lock()
 				if err == nil {
 					rep.Image.Direct = true
-					rep.Image.DirectWays = append(rep.Image.DirectWays, "无 SNI")
+					recordDirectWay(&rep.Image, "无 SNI")
 				} else {
 					rep.Image.DirectErrs = append(rep.Image.DirectErrs, Check{Name: "图片主机无 SNI 直连", Detail: h, Err: err})
 				}
@@ -155,7 +166,7 @@ func (s Suite) Run(ctx context.Context, env Environment, p Prober) Report {
 				mu.Lock()
 				if err == nil {
 					rep.Image.Direct = true
-					rep.Image.DirectWays = append(rep.Image.DirectWays, "常规")
+					recordDirectWay(&rep.Image, "常规")
 				} else {
 					rep.Image.DirectErrs = append(rep.Image.DirectErrs, Check{Name: "图片主机常规直连", Detail: h, Err: err})
 				}

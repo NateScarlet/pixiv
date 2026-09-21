@@ -202,26 +202,18 @@ func (r Report) dohClause() string {
 }
 
 // dataProxyClause 用一句话描述数据传输对代理的依赖；
-// 全部数据都需要代理的情形已由结论主句表达，不再重复。
+// dataProxyClause 用一句话描述数据传输对代理的依赖。
+//
+// 仅在全部数据都可直连时补充说明「无需代理」；某类数据需要代理的情形
+// 已由结论主句（hostState）表达，不再重复。
 func (r Report) dataProxyClause() string {
 	if r.Env.ProxyURL == nil {
 		return ""
 	}
-	var need []string
-	if len(r.API.DirectWays) == 0 && r.API.ViaProxy {
-		need = append(need, "API")
-	}
-	if len(r.Image.DirectWays) == 0 && r.Image.ViaProxy {
-		need = append(need, "图片")
-	}
-	switch {
-	case len(need) == 0:
+	if len(r.API.DirectWays) > 0 && len(r.Image.DirectWays) > 0 {
 		return "数据传输无需经过代理"
-	case len(r.API.DirectWays) > 0 || len(r.Image.DirectWays) > 0:
-		return strings.Join(need, "、") + "需要经过代理"
-	default:
-		return ""
 	}
+	return ""
 }
 
 // Render 把报告渲染为面向人的文本。

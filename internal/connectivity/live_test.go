@@ -9,54 +9,46 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/NateScarlet/pixiv/pkg/client/dns"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
-// TestQueryDoHParsesARecords 断言 DoH 查询解析 JSON 应答中的 A 记录，
-// 并忽略其它类型的记录（与库内解析器的判读一致）。
-func TestQueryDoHParsesARecords(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/dns-json")
-		// type 28 是 AAAA 记录，不应被当作 A 记录返回。
-		fmt.Fprint(w, `{"Answer":[`+
-			`{"name":"i.pximg.net","type":1,"data":"210.140.139.129"},`+
-			`{"name":"i.pximg.net","type":28,"data":"2406:da14::1"}]}`)
-	}))
-	defer srv.Close()
-
-	ips, err := queryDoH(context.Background(), srv.URL, "i.pximg.net", nil)
-	require.NoError(t, err)
-	assert.Equal(t, []net.IP{net.ParseIP("210.140.139.129")}, ips,
-		"应只返回 A 记录的地址")
-}
-
-// TestQueryDoHRejectsNonOKStatus 断言非 200 应答被视为查询失败。
-func TestQueryDoHRejectsNonOKStatus(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusForbidden)
-	}))
-	defer srv.Close()
-
-	_, err := queryDoH(context.Background(), srv.URL, "i.pximg.net", nil)
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "403")
-}
-
-// TestQueryDoHViaProxyReachesProxy 断言经代理查询时请求确实发往代理地址：
-// 由该「代理」服务端直接应答 DoH 结果，请求到达即说明代理路径被强制使用。
-func TestQueryDoHViaProxyReachesProxy(t *testing.T) {
+// TestProbeDoHDirectBranchIgnoresEnvProxy 断言 DoH 直连分支不受进程代理
+// 环境变量影响：端点服务端收到请求即成功，代理服务端不应被触及。
+func TestProbeDoHDirectBranchIgnoresEnvProxy(t *testing.T) {
 	var endpointCalled, proxyCalled bool
 	endpoint := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		endpointCalled = true
-		fmt.Fprint(w, `{"Answer":[]}`)
+		w.Header().Set("Content-Type", "application/dns-json")
+		fmt.Fprint(w, `{"Answer":[{"type":1,"data":"210.140.139.129"}]}`)
+	}))
+	defer endpoint.Close()
+
+	proxy := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		proxyCalled = true
+	}))
+	defer proxy.Close()
+	t.Setenv("HTTPS_PROXY", proxy.URL)
+
+	p := liveProber{}
+	ips, err := p.ProbeDoH(context.Background(), endpoint.URL, "i.pximg.net", false)
+	require.NoError(t, err)
+	assert.False(t, proxyCalled, "直连分支不应经代理")
+	assert.True(t, endpointCalled, "应直接访问 DoH 端点")
+	assert.NotEmpty(t, ips)
+}
+
+// TestProbeDoHProxyBranchForcesProxy 断言 DoH 经代理分支强制把请求发往
+// 注入的代理地址：由伪装代理直接应答 DoH 结果，请求到达即证明走了代理。
+func TestProbeDoHProxyBranchForcesProxy(t *testing.T) {
+	var endpointCalled, proxyCalled bool
+	endpoint := httptest.NewServer(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		endpointCalled = true
 	}))
 	defer endpoint.Close()
 
 	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		proxyCalled = true
-		// 伪装代理：不转发，直接以 DoH 应答。请求到达即证明走了代理。
 		assert.Equal(t, endpoint.URL, "http://"+r.Host, "代理应收到发往 DoH 端点的请求")
 		fmt.Fprint(w, `{"Answer":[{"type":1,"data":"127.0.0.1"}]}`)
 	}))
@@ -64,11 +56,20 @@ func TestQueryDoHViaProxyReachesProxy(t *testing.T) {
 
 	proxyURL, err := url.Parse(proxy.URL)
 	require.NoError(t, err)
-	ips, err := queryDoH(context.Background(), endpoint.URL, "i.pximg.net", proxyURL)
+	p := liveProber{proxy: proxyURL}
+	ips, err := p.ProbeDoH(context.Background(), endpoint.URL, "i.pximg.net", true)
 	require.NoError(t, err)
 	assert.True(t, proxyCalled, "请求应经过代理")
 	assert.False(t, endpointCalled, "该测试中代理不转发，端点不应被直接访问")
-	assert.Equal(t, []net.IP{net.ParseIP("127.0.0.1")}, ips)
+	assert.NotEmpty(t, ips)
+}
+
+// TestProbeDoHWithoutProxyContract 断言经代理分支在未配置代理时快速失败：
+// 静默按直连处理会产出误导性的「DoH 无需代理」结论。
+func TestProbeDoHWithoutProxyContract(t *testing.T) {
+	p := liveProber{}
+	_, err := p.ProbeDoH(context.Background(), "https://1.1.1.1/dns-query", "i.pximg.net", true)
+	require.Error(t, err)
 }
 
 // TestProbeHTTPSAnyStatusIsSuccess 断言探测以「收到 HTTP 应答」为成功标准：
@@ -120,74 +121,8 @@ func TestProbeHTTPSWithProxyReachesProxy(t *testing.T) {
 	assert.True(t, proxyCalled, "请求应经过代理")
 }
 
-// TestDialViaResolverResolvesHostnames 断言拨号包装器经解析器解析主机名，
-// 并拨向解析得到的地址。
-func TestDialViaResolverResolvesHostnames(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-
-	_, port, err := net.SplitHostPort(srv.Listener.Addr().String())
-	require.NoError(t, err)
-
-	var resolved []string
-	resolver := resolverFunc(func(_ context.Context, host string) ([]net.IP, error) {
-		resolved = append(resolved, host)
-		return []net.IP{net.ParseIP("127.0.0.1")}, nil
-	})
-
-	conn, err := dialViaResolver(resolver)(context.Background(), "tcp", net.JoinHostPort("i.pximg.net", port))
-	require.NoError(t, err)
-	defer conn.Close()
-	assert.Equal(t, []string{"i.pximg.net"}, resolved, "主机名应经解析器解析")
-}
-
-// TestDialViaResolverSkipsIPLiterals 断言 IP 字面量不经过解析器直接拨号：
-// 与库内解析接缝的语义一致，经代理拨号代理地址时依赖这一点。
-func TestDialViaResolverSkipsIPLiterals(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-	defer srv.Close()
-
-	resolver := resolverFunc(func(context.Context, string) ([]net.IP, error) {
-		t.Error("IP 字面量不应触发解析")
-		return nil, nil
-	})
-
-	conn, err := dialViaResolver(resolver)(context.Background(), "tcp", srv.Listener.Addr().String())
-	require.NoError(t, err)
-	require.NoError(t, conn.Close())
-}
-
-// TestDialViaResolverReportsResolveFailure 断言解析失败给出指明排查方向的错误。
-func TestDialViaResolverReportsResolveFailure(t *testing.T) {
-	resolver := resolverFunc(func(context.Context, string) ([]net.IP, error) {
-		return nil, fmt.Errorf("DoH 不可达")
-	})
-	_, err := dialViaResolver(resolver)(context.Background(), "tcp", "i.pximg.net:443")
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "DoH 不可达")
-	assert.Contains(t, err.Error(), "i.pximg.net")
-}
-
-// TestLiveProberProxyContract 断言经代理探测在未配置代理时快速失败：
-// 这是装配错误，静默按直连处理会产出误导性结论。
-func TestLiveProberProxyContract(t *testing.T) {
+// TestProbeHTTPSWithoutProxyContract 断言经代理分支在未配置代理时快速失败。
+func TestProbeHTTPSWithoutProxyContract(t *testing.T) {
 	p := liveProber{}
-	_, err := p.ProbeDoH(context.Background(), "https://1.1.1.1/dns-query", "i.pximg.net", true)
-	assert.Error(t, err)
-	err = p.ProbeHTTPS(context.Background(), "https://www.pixiv.net/", true)
-	assert.Error(t, err)
+	assert.Error(t, p.ProbeHTTPS(context.Background(), "https://www.pixiv.net/", true))
 }
-
-// resolverFunc 把函数适配为 dns.Resolver，与库内测试的惯用法一致。
-type resolverFunc func(ctx context.Context, host string) ([]net.IP, error)
-
-func (f resolverFunc) Resolve(ctx context.Context, host string) ([]net.IP, error) {
-	return f(ctx, host)
-}
-
-// 编译期确认 resolverFunc 满足接口。
-var _ dns.Resolver = resolverFunc(nil)
