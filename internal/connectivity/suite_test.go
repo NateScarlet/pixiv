@@ -110,7 +110,8 @@ func TestSuiteZeroValueUsesDefaultHosts(t *testing.T) {
 	rep := runSuite(t, testEnv(false), p)
 
 	assert.Contains(t, p.recordedCalls(), "ech:www.pixiv.net")
-	assert.Contains(t, p.recordedCalls(), "ech:app-api.pixiv.net")
+	assert.NotContains(t, p.recordedCalls(), "ech:app-api.pixiv.net",
+		"app-api 不在默认 API 探测清单：库并不向它发请求，探测它会掩盖 www 的失败")
 	assert.Contains(t, p.recordedCalls(), "nosni:i.pximg.net")
 	assert.Contains(t, p.recordedCalls(), "https:false:https://www.pixiv.net/")
 	assert.Contains(t, p.recordedCalls(), "https:false:https://i.pximg.net/")
@@ -198,7 +199,7 @@ func TestSuiteResolverQueriedForEveryHost(t *testing.T) {
 	runSuite(t, testEnv(false), p)
 
 	calls := p.recordedCalls()
-	for _, host := range []string{"www.pixiv.net", "app-api.pixiv.net", "i.pximg.net"} {
+	for _, host := range []string{"www.pixiv.net", "i.pximg.net"} {
 		assert.Contains(t, calls, "resolve:false:https://1.1.1.1/dns-query:"+host,
 			"每台主机都应有直连解析探测")
 	}
@@ -228,9 +229,8 @@ func TestSuiteReportsResolutionPerHost(t *testing.T) {
 		byHost[res.Host] = res.IPs[0].String()
 	}
 	assert.Equal(t, map[string]string{
-		"www.pixiv.net":     "172.64.145.17",
-		"app-api.pixiv.net": "172.64.145.17",
-		"i.pximg.net":       "210.140.139.132",
+		"www.pixiv.net": "172.64.145.17",
+		"i.pximg.net":   "210.140.139.132",
 	}, byHost)
 }
 
@@ -242,7 +242,7 @@ func TestSuiteReportsResolutionPerHost(t *testing.T) {
 func TestSuiteEndpointUsableWhenOneHostFails(t *testing.T) {
 	p := &fakeProber{
 		resolve: func(_ context.Context, _ string, host string, _ bool) ([]net.IP, error) {
-			if host == "app-api.pixiv.net" {
+			if host == "www.pixiv.net" {
 				return nil, errors.New("no such host")
 			}
 			return []net.IP{net.ParseIP("210.140.139.129")}, nil
@@ -280,7 +280,7 @@ func TestSuiteEndpointUnusableWhenAllHostsFail(t *testing.T) {
 func TestSuiteReportsResolutionFailurePerHost(t *testing.T) {
 	p := &fakeProber{
 		resolve: func(_ context.Context, _ string, host string, _ bool) ([]net.IP, error) {
-			if host == "app-api.pixiv.net" {
+			if host == "www.pixiv.net" {
 				return nil, errors.New("no such host")
 			}
 			return []net.IP{net.ParseIP("210.140.139.132")}, nil
@@ -293,7 +293,7 @@ func TestSuiteReportsResolutionFailurePerHost(t *testing.T) {
 
 	var failed *HostResolution
 	for i := range rep.Resolver.Resolutions {
-		if rep.Resolver.Resolutions[i].Host == "app-api.pixiv.net" {
+		if rep.Resolver.Resolutions[i].Host == "www.pixiv.net" {
 			failed = &rep.Resolver.Resolutions[i]
 		}
 	}
@@ -302,7 +302,7 @@ func TestSuiteReportsResolutionFailurePerHost(t *testing.T) {
 	assert.Contains(t, failed.Err.Error(), "no such host")
 
 	// 一台失败不应让其他主机的解析结果丢失。
-	assert.Len(t, rep.Resolver.Resolutions, 3)
+	assert.Len(t, rep.Resolver.Resolutions, 2)
 }
 
 // TestVerdictFullyDirect 断言 ECH 与无 SNI 直连都成功、常规直连被封锁时，
@@ -481,8 +481,8 @@ func TestVerdictUnavailableWithProxy(t *testing.T) {
 // TestSuiteProbesConcurrently 断言各探测并行执行：全部探测都到达屏障后才放行，
 // 若串行执行则永远到不齐、只能在套件超时后失败。
 func TestSuiteProbesConcurrently(t *testing.T) {
-	// 无代理环境的任务数：3 台主机各 1 次解析 + 2 台 API 主机 × 2 方式 + 1 台图片主机 × 2 方式。
-	const taskCount = 9
+	// 无代理环境的任务数：2 台主机各 1 次解析 + 1 台 API 主机 × 2 方式 + 1 台图片主机 × 2 方式。
+	const taskCount = 6
 
 	arrived := make(chan struct{}, taskCount)
 	allArrived := make(chan struct{})

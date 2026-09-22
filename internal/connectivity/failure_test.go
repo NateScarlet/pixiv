@@ -139,7 +139,6 @@ func TestRenderListsResolutionPerHost(t *testing.T) {
 			DirectOK: true,
 			Resolutions: []HostResolution{
 				{Host: "www.pixiv.net", IPs: []net.IP{net.ParseIP("172.64.145.17")}},
-				{Host: "app-api.pixiv.net", IPs: []net.IP{net.ParseIP("172.64.145.18")}},
 				{Host: "i.pximg.net", IPs: []net.IP{net.ParseIP("210.140.139.132")}},
 			},
 		},
@@ -150,7 +149,6 @@ func TestRenderListsResolutionPerHost(t *testing.T) {
 	out := buf.String()
 
 	assert.Contains(t, out, "www.pixiv.net: 172.64.145.17")
-	assert.Contains(t, out, "app-api.pixiv.net: 172.64.145.18")
 	assert.Contains(t, out, "i.pximg.net: 210.140.139.132")
 }
 

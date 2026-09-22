@@ -10,7 +10,11 @@ import (
 )
 
 // apiHosts 是要探测的 API 类主机（Cloudflare 托管，走 ECH 直连）。
-var apiHosts = []string{"www.pixiv.net", "app-api.pixiv.net"}
+//
+// 只含 www.pixiv.net：它是库实际发 API 请求的默认主机（client.defaultServerURL）。
+// app-api.pixiv.net 虽与 www 同属 API 路由表，但库从不向它发请求，纳入探测会
+// 掩盖 www 的失败，因此不作为 API 类连通性的判定对象。
+var apiHosts = []string{"www.pixiv.net"}
 
 // imageHosts 是要探测的图片类主机（走无 SNI 直连）。
 var imageHosts = []string{"i.pximg.net"}
