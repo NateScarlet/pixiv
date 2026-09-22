@@ -35,7 +35,8 @@ func TestDOHResolverUsesInjectedClient(t *testing.T) {
 	t.Cleanup(srv.Close)
 
 	used := &http.Client{}
-	r := NewDOHResolverWithClient(srv.URL, used)
+	// 该伪端点以 JSON 对答，因此声明 JSON 方式；本用例关心的是 client 被使用。
+	r := NewDOHResolverWithClient(srv.URL+"#type=json", used)
 	ips, err := r.Resolve(context.Background(), "i.pximg.net")
 	require.NoError(t, err)
 	assert.True(t, called, "查询应经注入的 client 发出")

@@ -21,9 +21,19 @@ PIXIV_DNS_QUERY_URL
   免代理所需要的 DNS over HTTPS 使用的服务网址。
   等价于 ``client.WithDNSResolver`` 注入一个使用该地址的解析器。
 
-  服务器接口应类似于 `Google 公共 DNS 的 JSON API <https://developers.google.com/speed/public-dns/docs/doh/json>`_ ，大部分公共 DNS 服务应该都支持这个格式。
+  默认按 `RFC 8484 <https://www.rfc-editor.org/rfc/rfc8484>`_ 的二进制报文接口查询
+  （``GET`` + ``dns`` 参数携带 base64url 编码的 DNS 报文，``Accept: application/dns-message``）。
+  这是标准要求实现必须支持的接口，符合标准的服务端都能用。
 
-  使用时将设置 name 参数和 Accept:application/dns-json。
+  若要改用 `Google 公共 DNS 的 JSON API <https://developers.google.com/speed/public-dns/docs/doh/json>`_ ，
+  在网址后加上 fragment ``#type=json``（此时设置 name 参数与 ``Accept: application/dns-json``）。
+  少数服务端（例如 ``dnscrypt-proxy`` 的本地 DoH 服务端）只实现二进制接口，
+  用 JSON 方式查询会被以 ``400 Bad Request`` 拒绝。
+
+  fragment 只用于向本库声明查询方式，不会发往服务端。
+  声明非法（如 ``#type=binary``、``#json``）时构造客户端会 panic，
+  而不是静默回落——静默回落会得到一个「端点拒绝查询」的错误，
+  掩盖网址写错这个真实原因。
 
   部分可用 DoH 服务网址：
 
@@ -34,6 +44,11 @@ PIXIV_DNS_QUERY_URL
   - ``https://cloudflare-dns.com/dns-query``
 
   - ``https://dns.nextdns.io/dns-query``
+
+  自建的 DoH 端点照常按系统信任根校验证书，无需额外配置：
+  只要其 CA 已装入系统信任根即可（Windows 上即「受信任的根证书颁发机构」）。
+
+  若端点只支持 JSON 接口，写成 ``https://doh.example.com/dns-query#type=json``。
 
 已移除的环境变量
 --------------------

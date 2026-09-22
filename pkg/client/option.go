@@ -163,6 +163,9 @@ const DefaultDNSQueryURL = defaultDNSQueryURL
 
 // defaultDNSResolver 返回环境变量播种的默认解析器，供本库自带的
 // 连接能力（例如图像主机的无 SNI 直连）解析目标主机。
+//
+// 查询方式由端点 URL 的 fragment 声明（形如 #type=json），默认是
+// RFC 8484 的二进制报文方式，因此无需单独的配置项。
 func defaultDNSResolver() dns.Resolver {
 	var queryURL = os.Getenv("PIXIV_DNS_QUERY_URL")
 	if queryURL == "" {

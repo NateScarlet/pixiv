@@ -7,6 +7,8 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -347,6 +349,70 @@ func TestClientConcurrentUseAndCopy(t *testing.T) {
 		t.Error(err)
 	}
 	assert.Equal(t, goroutines*requestsPerGoroutine, spy.count())
+}
+
+// TestDNSQueryURLDeclaresWireFormat 断言查询方式由 PIXIV_DNS_QUERY_URL 的
+// fragment 声明，无需单独的配置项。
+//
+// 只支持 RFC 8484 二进制报文的服务端（例如 dnscrypt-proxy 的本地 DoH
+// 服务端）在收到 JSON 接口的查询时以 400 拒绝，因此需要能切换到 JSON
+// 之外的写法；默认即二进制，符合标准对实现的要求。
+func TestDNSQueryURLDeclaresWireFormat(t *testing.T) {
+	var gotQuery url.Values
+	var gotAccept string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		gotQuery = req.URL.Query()
+		gotAccept = req.Header.Get("Accept")
+		// 只认 RFC 8484：没有 dns 参数即拒绝。
+		if req.URL.Query().Get("dns") == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		w.Header().Set("Content-Type", "application/dns-message")
+		// ID 回显 + 一条 A 记录的最小应答。
+		_, _ = w.Write([]byte{
+			0x00, 0x00, 0x81, 0x80, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+			1, 'i', 5, 'p', 'x', 'i', 'm', 'g', 3, 'n', 'e', 't', 0,
+			0x00, 0x01, 0x00, 0x01,
+			0xc0, 0x0c, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x3c, 0x00, 0x04,
+			210, 140, 139, 129,
+		})
+	}))
+	t.Cleanup(srv.Close)
+
+	t.Run("默认二进制", func(t *testing.T) {
+		t.Setenv("PIXIV_DNS_QUERY_URL", srv.URL)
+		ips, err := defaultDNSResolver().Resolve(context.Background(), "i.pximg.net")
+		require.NoError(t, err)
+		assert.Equal(t, "application/dns-message", gotAccept)
+		assert.Empty(t, gotQuery.Get("name"), "二进制方式不应发 name 参数")
+		require.Len(t, ips, 1)
+		assert.Equal(t, "210.140.139.129", ips[0].String())
+	})
+
+	t.Run("fragment 声明不进入请求", func(t *testing.T) {
+		t.Setenv("PIXIV_DNS_QUERY_URL", srv.URL+"#type=message")
+		_, err := defaultDNSResolver().Resolve(context.Background(), "i.pximg.net")
+		require.NoError(t, err)
+		assert.Empty(t, gotQuery.Get("name"))
+	})
+
+	t.Run("声明 json 时走 JSON 接口", func(t *testing.T) {
+		t.Setenv("PIXIV_DNS_QUERY_URL", srv.URL+"#type=json")
+		// 该服务端只认二进制，因此走 JSON 必然被拒绝——这正说明它确实是 JSON 方式。
+		_, err := defaultDNSResolver().Resolve(context.Background(), "i.pximg.net")
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "status 400")
+	})
+}
+
+// TestDNSQueryURLInvalidFragmentPanics 断言 fragment 取值非法时快速失败：
+// 静默回落会得到「端点拒绝查询」的误导性错误，而真实原因是 URL 写错了。
+func TestDNSQueryURLInvalidFragmentPanics(t *testing.T) {
+	t.Setenv("PIXIV_DNS_QUERY_URL", "https://doh.example/dns-query#type=binary")
+	assert.PanicsWithValue(t,
+		`pixiv: dns: DoH 端点地址 "https://doh.example/dns-query#type=binary": type 的值 "binary" 无效: 可用值为 json、message`,
+		func() { defaultDNSResolver() })
 }
 
 // resolverFunc 便于在测试中构造解析器。

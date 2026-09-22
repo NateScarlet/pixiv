@@ -31,7 +31,8 @@ func TestProbeDoHDirectBranchIgnoresEnvProxy(t *testing.T) {
 	t.Setenv("HTTPS_PROXY", proxy.URL)
 
 	p := liveProber{}
-	ips, err := p.ProbeDoH(context.Background(), endpoint.URL, "i.pximg.net", false)
+	// 该伪端点以 JSON 对答，因此声明 JSON 方式；本用例关心的是代理路径。
+	ips, err := p.ProbeDoH(context.Background(), endpoint.URL+"#type=json", "i.pximg.net", false)
 	require.NoError(t, err)
 	assert.False(t, proxyCalled, "直连分支不应经代理")
 	assert.True(t, endpointCalled, "应直接访问 DoH 端点")
@@ -57,7 +58,8 @@ func TestProbeDoHProxyBranchForcesProxy(t *testing.T) {
 	proxyURL, err := url.Parse(proxy.URL)
 	require.NoError(t, err)
 	p := liveProber{proxy: proxyURL}
-	ips, err := p.ProbeDoH(context.Background(), endpoint.URL, "i.pximg.net", true)
+	// 该伪代理以 JSON 对答，因此声明 JSON 方式；本用例关心的是走了代理。
+	ips, err := p.ProbeDoH(context.Background(), endpoint.URL+"#type=json", "i.pximg.net", true)
 	require.NoError(t, err)
 	assert.True(t, proxyCalled, "请求应经过代理")
 	assert.False(t, endpointCalled, "该测试中代理不转发，端点不应被直接访问")
