@@ -70,6 +70,15 @@ type probeTask struct {
 	run    func(ctx context.Context) error
 }
 
+// noSNIDetail 返回不发送 SNI 探测的明细：请求主机若在 no-SNI 目标别名中，
+// 则标出实际拨号的源站，避免把「连上的是源站」误读成「连上了该主机自身」。
+func noSNIDetail(host string) string {
+	if target, ok := client.NoSNIHostTarget()[host]; ok && target != host {
+		return fmt.Sprintf("%s（no-SNI 拨号至源站 %s）", host, target)
+	}
+	return host
+}
+
 // recordDirectWay 把一种直连方式记入主机报告，同种方式（多台主机共享）
 // 只记录一次，避免结论句出现「ECH、ECH」。
 func recordDirectWay(h *HostReport, way string) {
@@ -179,7 +188,7 @@ func (s Suite) Run(ctx context.Context, env Environment, p Prober) Report {
 		// 拨号解析到 pixiv.net 源站（见 client.NoSNIHostTarget），它接受不发送
 		// SNI 的握手而 ECH 需落在 Cloudflare。
 		record(probeTask{
-			name: "API 主机无 SNI 直连", detail: h,
+			name: "API 主机无 SNI 直连", detail: noSNIDetail(h),
 			run: func(ctx context.Context) error {
 				err := p.ProbeNoSNI(ctx, h)
 				mu.Lock()
@@ -187,7 +196,7 @@ func (s Suite) Run(ctx context.Context, env Environment, p Prober) Report {
 					rep.API.Direct = true
 					recordDirectWay(&rep.API, "无 SNI")
 				} else {
-					rep.API.DirectErrs = append(rep.API.DirectErrs, Check{Name: "API 主机无 SNI 直连", Detail: h, Err: err})
+					rep.API.DirectErrs = append(rep.API.DirectErrs, Check{Name: "API 主机无 SNI 直连", Detail: noSNIDetail(h), Err: err})
 				}
 				mu.Unlock()
 				return err
