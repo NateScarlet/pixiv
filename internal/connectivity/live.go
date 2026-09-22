@@ -57,7 +57,9 @@ func (p liveProber) ProbeDoH(ctx context.Context, endpoint, host string, viaProx
 		// 受控分支：禁用代理，使直连查询不受进程环境变量影响。
 		hc.Transport = &http.Transport{Proxy: nil}
 	}
-	r := dns.NewDOHResolverWithClient(endpoint, hc)
+	// 受控分支注入 client 以复现直连 / 经代理两种环境；
+	// 编码方式仍由端点 URL 的 fragment 决定，与运行时同一来源。
+	r := dns.NewDOHResolver(endpoint, dns.WithHTTPClient(hc))
 	return r.Resolve(ctx, host)
 }
 

@@ -12,11 +12,15 @@ package connectivity
 
 import (
 	"context"
+	"crypto/tls"
+	"errors"
 	"fmt"
 	"io"
 	"net"
 	"net/url"
 	"strings"
+
+	"github.com/NateScarlet/pixiv/pkg/client/dns"
 )
 
 // Environment 收集探测所需的环境信息，由最外层装配。
@@ -92,6 +96,87 @@ type DoHReport struct {
 // 未配置代理时恒为 false——此时没有代理可走，「需要代理」无从谈起。
 func (r DoHReport) NeedsProxy() bool {
 	return r.ProxyOK && !r.DirectOK
+}
+
+// 失败归因，用于把「端点不可达」细分为可操作的结论。
+type failureKind int
+
+const (
+	// failureNone 表示没有失败。
+	failureNone failureKind = iota
+	// failureUnreachable 是连接层失败：端点连不上，与查询内容无关。
+	failureUnreachable
+	// failureTLS 是证书校验失败：连上了但对端证书不被信任。
+	failureTLS
+	// failureRejected 是端点返回了非成功状态码：端点可达，但拒绝了这次查询。
+	failureRejected
+	// failureUnparsable 是响应无法解析：端点可达且接受了查询，但响应不合预期。
+	failureUnparsable
+)
+
+// classifyFailure 判定一次失败的性质。
+//
+// 三者的处置完全不同：不可达要查网络，证书失败要处理信任，
+// 被拒绝要查端点的协议支持——归成同一句话会让排查方向全错。
+func classifyFailure(err error) failureKind {
+	if err == nil {
+		return failureNone
+	}
+	// 端点返回了非成功状态码：可达但拒绝了查询。
+	var statusErr *dns.StatusError
+	if errors.As(err, &statusErr) {
+		return failureRejected
+	}
+	// 响应无法按预期解读：可达且接受了查询，但内容不合预期。
+	var parseErr *dns.ParseError
+	if errors.As(err, &parseErr) {
+		return failureUnparsable
+	}
+	// 证书校验失败在 Go 中是一个可判别的错误类型。
+	var certErr *tls.CertificateVerificationError
+	if errors.As(err, &certErr) {
+		return failureTLS
+	}
+	// 连不上：拒绝连接、超时等。
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return failureUnreachable
+	}
+	// DNS 解析失败。
+	var dnsErr *net.DNSError
+	if errors.As(err, &dnsErr) {
+		return failureUnreachable
+	}
+	// 无法判别的失败按最保守的归因处理，不臆断原因。
+	return failureUnreachable
+}
+
+// describeFailure 用一句话说明 DoH 失败的性质，供结论句使用。
+func describeFailure(err error) string {
+	switch classifyFailure(err) {
+	case failureTLS:
+		return "DoH 端点证书不被信任"
+	case failureRejected:
+		return "DoH 端点拒绝了查询（端点可达，但不接受这种查询）"
+	case failureUnparsable:
+		return "DoH 端点的响应无法解析"
+	case failureUnreachable:
+		return "DoH 端点不可达"
+	default:
+		return "DoH 查询失败"
+	}
+}
+
+// hintFailure 给出针对该失败性质的处置建议；无需额外说明时返回空串。
+func hintFailure(err error) string {
+	switch classifyFailure(err) {
+	case failureRejected:
+		return "端点可达但不接受查询，通常是它不实现当前编码方式：用 #type=json 或 #type=message 声明正确的方式"
+	case failureTLS:
+		return "自建端点需把其 CA 装入系统信任根"
+	default:
+		return ""
+	}
 }
 
 // Report 是一次探测的完整结果。
@@ -181,12 +266,15 @@ func hostState(h HostReport) string {
 }
 
 // dohClause 用一句话描述 DoH 与代理的关系。
+//
+// 失败时按真实原因归因：「端点不可达」「证书不被信任」「端点拒绝了查询」
+// 是三件不同的事，混为一谈会把排查方向带偏。
 func (r Report) dohClause() string {
 	if r.Env.ProxyURL == nil {
 		if r.DoH.DirectOK {
 			return "DoH 直连可用"
 		}
-		return "DoH 端点不可达（直连查询失败）"
+		return dohFailureClause(r.DoH.DirectErr)
 	}
 	switch {
 	case r.DoH.NeedsProxy():
@@ -197,8 +285,19 @@ func (r Report) dohClause() string {
 	case r.DoH.ProxyOK:
 		return "DoH 直连不可用，经代理可用"
 	default:
-		return "DoH 端点不可达（直连与代理均失败）"
+		// 两条路径都失败：直连的失败原因更能说明端点本身的问题
+		// （代理路径的失败可能只是代理不可用）。
+		return dohFailureClause(r.DoH.DirectErr)
 	}
+}
+
+// dohFailureClause 依据 DoH 失败的原因给出结论与处置建议。
+func dohFailureClause(err error) string {
+	text := describeFailure(err)
+	if hint := hintFailure(err); hint != "" {
+		text += "——" + hint
+	}
+	return text
 }
 
 // dataProxyClause 用一句话描述数据传输对代理的依赖；

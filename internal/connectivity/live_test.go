@@ -13,6 +13,59 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// TestProbeDoHUsesEndpointDeclaredWireFormat 断言探测按端点 URL 声明的
+// 编码方式发出查询。
+//
+// 探测与运行时取自同一端点字符串，因此运行时能用的写法探测也能用：
+// 端点只支持 RFC 8484 二进制接口时（如 dnscrypt-proxy 本地 DoH），
+// 用 JSON 方式探测会得到一个「端点拒绝查询」的结论，而运行时其实可用。
+func TestProbeDoHUsesEndpointDeclaredWireFormat(t *testing.T) {
+	newEndpoint := func() (*httptest.Server, *string, *string) {
+		var gotDNS, gotName string
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			gotDNS = req.URL.Query().Get("dns")
+			gotName = req.URL.Query().Get("name")
+			if gotDNS == "" {
+				// 只实现 RFC 8484：没有 dns 参数即拒绝。
+				w.WriteHeader(http.StatusBadRequest)
+				return
+			}
+			w.Header().Set("Content-Type", "application/dns-message")
+			_, _ = w.Write([]byte{
+				0x00, 0x00, 0x81, 0x80, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00,
+				1, 'i', 5, 'p', 'x', 'i', 'm', 'g', 3, 'n', 'e', 't', 0,
+				0x00, 0x01, 0x00, 0x01,
+				0xc0, 0x0c, 0x00, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x3c, 0x00, 0x04,
+				210, 140, 139, 129,
+			})
+		}))
+		return srv, &gotDNS, &gotName
+	}
+
+	t.Run("默认二进制", func(t *testing.T) {
+		srv, gotDNS, gotName := newEndpoint()
+		defer srv.Close()
+
+		p := liveProber{}
+		ips, err := p.ProbeDoH(context.Background(), srv.URL, "i.pximg.net", false)
+		require.NoError(t, err)
+		assert.NotEmpty(t, *gotDNS, "默认应按二进制报文方式发出查询")
+		assert.Empty(t, *gotName, "二进制方式不应发 name 参数")
+		require.Len(t, ips, 1)
+		assert.Equal(t, "210.140.139.129", ips[0].String())
+	})
+
+	t.Run("fragment 不发给服务端", func(t *testing.T) {
+		srv, gotDNS, _ := newEndpoint()
+		defer srv.Close()
+
+		p := liveProber{}
+		_, err := p.ProbeDoH(context.Background(), srv.URL+"#type=message", "i.pximg.net", false)
+		require.NoError(t, err)
+		assert.NotEmpty(t, *gotDNS)
+	})
+}
+
 // TestProbeDoHDirectBranchIgnoresEnvProxy 断言 DoH 直连分支不受进程代理
 // 环境变量影响：端点服务端收到请求即成功，代理服务端不应被触及。
 func TestProbeDoHDirectBranchIgnoresEnvProxy(t *testing.T) {
@@ -31,7 +84,7 @@ func TestProbeDoHDirectBranchIgnoresEnvProxy(t *testing.T) {
 	t.Setenv("HTTPS_PROXY", proxy.URL)
 
 	p := liveProber{}
-	// 该伪端点以 JSON 对答，因此声明 JSON 方式；本用例关心的是代理路径。
+	// 该伪端点以 JSON 对答，因此按 JSON 方式查询；本用例关心的是代理路径。
 	ips, err := p.ProbeDoH(context.Background(), endpoint.URL+"#type=json", "i.pximg.net", false)
 	require.NoError(t, err)
 	assert.False(t, proxyCalled, "直连分支不应经代理")
@@ -58,7 +111,7 @@ func TestProbeDoHProxyBranchForcesProxy(t *testing.T) {
 	proxyURL, err := url.Parse(proxy.URL)
 	require.NoError(t, err)
 	p := liveProber{proxy: proxyURL}
-	// 该伪代理以 JSON 对答，因此声明 JSON 方式；本用例关心的是走了代理。
+	// 该伪代理以 JSON 对答，因此按 JSON 方式查询；本用例关心的是走了代理。
 	ips, err := p.ProbeDoH(context.Background(), endpoint.URL+"#type=json", "i.pximg.net", true)
 	require.NoError(t, err)
 	assert.True(t, proxyCalled, "请求应经过代理")
