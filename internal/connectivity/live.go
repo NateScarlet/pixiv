@@ -108,11 +108,16 @@ func (p liveProber) ProbeECH(ctx context.Context, host string) error {
 
 // ProbeNoSNI implements Prober.
 //
-// 与运行时图片通道共享同一构造：NewNoSNITransport(nil) 自建 base 并设置
-// 库内的解析接缝，解析器经 WithDNSResolver 注入。
+// 与运行时 no-SNI 通道共享同一构造：用带目标别名的 base（见 client.NoSNIHostTarget）
+// 叠加不发送 SNI 的原语，解析器经 WithDNSResolver 注入——请求 Host:www.pixiv.net
+// 时落到 pixiv.net 源站，与 AutoTransport 的 no-SNI 腿一致。
 func (p liveProber) ProbeNoSNI(ctx context.Context, host string) error {
 	c := client.New(
-		client.WithTransport(client.NewNoSNITransport(nil)),
+		// 与运行时 no-SNI 通道一致：请求 Host:www.pixiv.net 时拨号解析到 pixiv.net
+		// 源站（Cloudflare 拒绝 no-SNI 握手，只有源站接受），见 client.NoSNIHostTarget。
+		client.WithTransport(client.NewNoSNITransport(
+			client.NewHostAliasTransport(nil, client.NoSNIHostTarget()),
+		)),
 		client.WithDNSResolver(p.resolver),
 	)
 	return probeWithClient(ctx, c, fmt.Sprintf("https://%s/", host))

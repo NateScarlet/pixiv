@@ -204,15 +204,13 @@ func TestGetBodyRequestFallsBack(t *testing.T) {
 	base := roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 		b, _ := io.ReadAll(req.Body)
 		baseSeenBodies = append(baseSeenBodies, string(b))
-		return nil, errors.New("stub: 不可用")
+		return nil, errors.New("stub: 常规不可用")
 	})
-	rt := &AutoTransport{Base: base}
+	rt := &AutoTransport{hostNames: &hostSets{image: map[string]struct{}{"i.pximg.net": {}}}}
 	rt.once.Do(func() {
 		rt.base = base
-		rt.routed = newRoutedTransportWithRoutes(base, map[string]route{
-			"i.pximg.net": {rt: roundTripperFunc(func(req *http.Request) (*http.Response, error) {
-				return nil, errors.New("stub: 特殊方式不可用")
-			})},
+		rt.nosni = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			return nil, errors.New("stub: 不发送 SNI 不可用")
 		})
 	})
 
@@ -220,8 +218,8 @@ func TestGetBodyRequestFallsBack(t *testing.T) {
 	require.NoError(t, err)
 	_, err = rt.RoundTrip(req)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "stub: 特殊方式不可用")
-	assert.Contains(t, err.Error(), "stub: 不可用")
+	assert.Contains(t, err.Error(), "stub: 不发送 SNI 不可用")
+	assert.Contains(t, err.Error(), "stub: 常规不可用")
 	// 首选方式因请求未发出而未消费 body，重试时应以完整 body 发出。
 	assert.Equal(t, []string{"payload"}, baseSeenBodies)
 }
@@ -507,7 +505,9 @@ func TestDNSResolverUsedByStandalonePrimitive(t *testing.T) {
 	}
 
 	c := New(
-		WithTransport(NewNoSNITransport(failingDialTransport())),
+		// 单独使用 no-SNI 原语时，解析由 base 提供：套一个带默认解析的 base，
+		// 使注入的解析器仍生效（见 NewHostAliasTransport）。
+		WithTransport(NewNoSNITransport(NewHostAliasTransport(failingDialTransport(), nil))),
 		WithDNSResolver(resolverFunc(record)),
 	)
 	_, err := c.Get("https://i.pximg.net/x.png")

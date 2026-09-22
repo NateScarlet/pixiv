@@ -481,8 +481,8 @@ func TestVerdictUnavailableWithProxy(t *testing.T) {
 // TestSuiteProbesConcurrently 断言各探测并行执行：全部探测都到达屏障后才放行，
 // 若串行执行则永远到不齐、只能在套件超时后失败。
 func TestSuiteProbesConcurrently(t *testing.T) {
-	// 无代理环境的任务数：2 台主机各 1 次解析 + 1 台 API 主机 × 2 方式 + 1 台图片主机 × 2 方式。
-	const taskCount = 6
+	// 无代理环境的任务数：2 台主机各 1 次解析 + 1 台 API 主机 × 3 方式 + 1 台图片主机 × 2 方式。
+	const taskCount = 7
 
 	arrived := make(chan struct{}, taskCount)
 	allArrived := make(chan struct{})

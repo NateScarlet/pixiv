@@ -161,16 +161,25 @@ SNI 阻断机制
 代理时被静默忽略，故不使用）。这一步因此由路由层在收到响应后按实际协商出的证书
 补齐：它知道请求主机，证书不匹配时请求报错，而不是把响应交给调用者。
 
-因此默认配置下，对托管在 Cloudflare 的 API 主机是**经 ECH 直连**的，
-不需要调用者额外配置。若该途径在当前网络下不可用（例如中间设备对外层名
-区别对待），请求会回落到常规连接；此时若系统解析返回被污染的地址，连接仍会
-失败，需要配合 ``WithDNSResolver`` 指定可用的 DoH 端点。
+因此默认配置下，对托管在 Cloudflare 的 API 主机首选 **经 ECH 直连**。``AutoTransport``
+会按主机尝试若干方式（API 主机依次为 ECH、不发送 SNI、常规），定位到一个可用方式后
+尽量沿用。它**不承诺任何具体的尝试顺序或记忆行为**——调用者只应依赖「请求被正确
+发出，或返回错误」这一外部结果。若系统解析返回被污染的地址，连接仍会失败，需要配合
+``WithDNSResolver`` 指定可用的 DoH 端点。
 
-实测表明第 2 步已被服务端拒绝：连接到源站、不发送 SNI 时，TLS 握手可以完成、
-证书校验也通过（证书为 ``*.pixiv.net``），但 HTTP 层返回 nginx 的 ``403 Forbidden``。
-这与社区观察一致——Pixiv 的 WAF 不再接受 SNI 与 Host 不匹配的请求。
+两种方式需要**不同的目标地址**，因此各按各自的解析目标拨号，而非在 DNS 上做一刀切的
+替换：默认传输对 ``www.pixiv.net`` 的 no-SNI 腿使用带目标别名的底层
+（``NewHostAliasTransport``，见 `client.NoSNIHostTarget`_）——请求 ``Host:www.pixiv.net``、
+拨号解析到 ``pixiv.net`` 源站；ECH 与常规仍解析 ``www.pixiv.net``（Cloudflare）。
+两者由此可以同时可用：``pixiv-doctor`` 在同一环境下实测 `API 主机 ECH 直连` 与
+`API 主机无 SNI 直连` 均成功。``www.pixiv.net`` 被污染时 ECH 失败，no-SNI 仍经源站可用。
 
-因此该机制目前对画作 / 小说等 API 主机不再可用；对 ``i.pximg.net`` 取图仍然有效。
+源站接受不发送 SNI 的握手、证书 ``*.pixiv.net`` 也能通过主机名校验；实测经 no-SNI
+连接源站，TLS 握手与证书校验均通过、能建立 HTTP 应答（根路径返回 nginx 的
+``403 Forbidden``，与 ``i.pximg.net`` 常规表现一致），但 API 路径的宽容度由服务端策略
+决定，需在真实请求下验证（``pixiv-doctor`` 的 `API 主机无 SNI 直连` 探测反映连接层
+可用性）。调用者**显式**提供传输时，其中的传输是明确指令，API 主机只走 ECH，不套
+该 no-SNI 别名。
 
 ECH (Encrypted Client Hello)
 --------------------------------

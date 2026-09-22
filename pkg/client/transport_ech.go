@@ -206,7 +206,7 @@ func (t *echTransport) transportWith(configList []byte) *http.Transport {
 	// 但单份传输也可能被复用于不同目标，故按拨号目标判断，IP 字面量不解析——
 	// 与单独使用 NewNoSNITransport 的语义一致。经代理时拨号的是代理地址，
 	// 解析交由代理完成。
-	out.DialContext = resolverDialContext(out.DialContext, "")
+	out.DialContext = resolverDialContext(out.DialContext, "", nil)
 	return out
 }
 
@@ -363,7 +363,7 @@ func (t *echTransport) bootstrapHandshake(
 	ctx context.Context, host, port string, probeTLS *tls.Config,
 ) ([]byte, error) {
 	addr := net.JoinHostPort(host, port)
-	rawConn, err := resolverDialContext(t.base.DialContext, host)(ctx, "tcp", addr)
+	rawConn, err := resolverDialContext(t.base.DialContext, host, nil)(ctx, "tcp", addr)
 	if err != nil {
 		return nil, fmt.Errorf("pixiv: client: ECH 自举连接 %s 失败: %w", host, err)
 	}

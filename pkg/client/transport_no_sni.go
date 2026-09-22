@@ -29,6 +29,8 @@ const noSNIServerName = "0.0.0.0"
 // 返回的传输克隆自 base，因此可与其他原语嵌套组合，且不改变调用者的 base。
 func NewNoSNITransport(base *http.Transport) *http.Transport {
 	if base == nil {
+		// 未指定时使用进程默认传输。本原语不承担解析：需要经注入的解析器或
+		// 不同的解析目标（别名）时，由调用者用 NewHostAliasTransport 组合 base。
 		base = defaultBaseTransport()
 	}
 	var t = base.Clone()
@@ -48,9 +50,7 @@ func NewNoSNITransport(base *http.Transport) *http.Transport {
 		)
 	}
 	t.TLSClientConfig = cfg
-	// 主机名留空：拨号目标即请求主机，因此经代理时拨号的是代理地址、
-	// 由代理解析目标主机，而解析器只解析真正的目标主机。
-	t.DialContext = resolverDialContext(t.DialContext, "")
+	// 拨号与解析（含目标主机别名）全部委托给 base，本原语只叠加「不发送 SNI」。
 	return t
 }
 

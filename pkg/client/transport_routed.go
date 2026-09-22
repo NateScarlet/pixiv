@@ -28,6 +28,16 @@ var imageHostnames = map[string]struct{}{
 	"i.pximg.net": {},
 }
 
+// noSNIHostTarget 供不发送 SNI 的连接使用的目标主机别名，按请求主机精确匹配。
+//
+// www.pixiv.net 托管在 Cloudflare，后者拒绝不携带 SNI 的握手；而它也有 Pixiv 源站
+// （经 pixiv.net 解析）。因此请求 Host:www.pixiv.net、以不发送 SNI 的方式连接时，
+// 拨号并解析到 pixiv.net 源站。只作用于 no-SNI 路径：ECH 需落在 Cloudflare，
+// 仍解析 www.pixiv.net。
+var noSNIHostTarget = map[string]string{
+	"www.pixiv.net": "pixiv.net",
+}
+
 // NewRoutedTransport 按请求主机把请求交给适合该主机的通道。
 //
 // 主机清单由库持有：调用者不需要知道 pixiv 有哪些主机、哪个主机该用哪种方式，

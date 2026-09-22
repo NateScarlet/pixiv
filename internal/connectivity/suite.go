@@ -152,6 +152,24 @@ func (s Suite) Run(ctx context.Context, env Environment, p Prober) Report {
 				return err
 			},
 		})
+		// API 主机在 ECH 之外还探测不发送 SNI 的路径：no-SNI 对 www.pixiv.net
+		// 拨号解析到 pixiv.net 源站（见 client.NoSNIHostTarget），它接受不发送
+		// SNI 的握手而 ECH 需落在 Cloudflare。
+		record(probeTask{
+			name: "API 主机无 SNI 直连", detail: h,
+			run: func(ctx context.Context) error {
+				err := p.ProbeNoSNI(ctx, h)
+				mu.Lock()
+				if err == nil {
+					rep.API.Direct = true
+					recordDirectWay(&rep.API, "无 SNI")
+				} else {
+					rep.API.DirectErrs = append(rep.API.DirectErrs, Check{Name: "API 主机无 SNI 直连", Detail: h, Err: err})
+				}
+				mu.Unlock()
+				return err
+			},
+		})
 	}
 	for _, h := range hosts.Image {
 		record(probeTask{
