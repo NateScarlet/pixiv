@@ -114,18 +114,20 @@ func FromURL(rawURL string) (_ URLs, err error) {
 	}, nil
 }
 
-// pathSegments 列出 pixiv 图片 CDN 用于区分图片类别的路径段，即本包掌握的
-// pixiv 侧布局知识所在。[IsImageURL] 以此判读一个地址是不是图片。
+// pathSegments 列出 pixiv 图片 CDN 用于区分资源类别的路径段，即本包掌握的
+// pixiv 侧布局知识所在。[IsImageURL] 以此判读一个地址是不是可取的 pixiv
+// CDN 资源（图片或动图 zip）。
 //
 // 缩略图带 /c/{size}/ 前缀，且段可能带尺寸或类别后缀（如 novel-cover-original），
 // 因此段不一定位于首段、也不一定与这里的字面量完全相等。
 var pathSegments = []string{
-	"img-master",   // 画作（含各缩放尺寸）
-	"img-original", // 画作原图
-	"custom-thumb", // 作者自定义裁剪的缩略图
-	"novel-cover",  // 小说封面
-	"user-profile", // 用户头像
-	"background",   // 用户背景图
+	"img-master",     // 画作（含各缩放尺寸）
+	"img-original",   // 画作原图
+	"custom-thumb",   // 作者自定义裁剪的缩略图
+	"novel-cover",    // 小说封面
+	"user-profile",   // 用户头像
+	"background",     // 用户背景图
+	"img-zip-ugoira", // 动图 zip（需要 Referer 取回，同图片）
 }
 
 // artworkPathSegments 是 [PathSegments] 中具备各尺寸结构、因而可被 [FromURL]
@@ -147,12 +149,12 @@ func PathSegments() []string { return slices.Clone(pathSegments) }
 // ArtworkPathSegments 返回 [PathSegments] 中具备各尺寸结构的那部分。
 func ArtworkPathSegments() []string { return slices.Clone(artworkPathSegments) }
 
-// IsImageURL 报告地址是否指向 pixiv 图片 CDN 上的图片。
+// IsImageURL 报告地址是否指向 pixiv 图片 CDN 上可取回的资源（图片或动图 zip）。
 //
 // 它只做结构判断，不校验主机名：pixiv 图片虽只在自有源站提供，但按主机校验
 // 会让本地端点（测试用的 httptest 服务）无法被识别，而主机可达性本来就由
 // 请求结果回答。它也不要求地址能被 [FromURL] 重建各尺寸——小说封面、头像等
-// 并不具备画作那样的尺寸结构，但仍然是可以取回的图片。
+// 并不具备画作那样的尺寸结构，动图 zip 亦然，但都是可以取回的资源。
 func IsImageURL(rawURL string) bool {
 	u, err := url.Parse(rawURL)
 	if err != nil {

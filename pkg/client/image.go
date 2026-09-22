@@ -14,8 +14,8 @@ import (
 // 而不必匹配错误文本。三类分别对应「传错了参数」「服务端拒绝了这次请求」
 // 「根本没连上主机（含解析失败）」。
 var (
-	// ErrImageURLNotRecognized 表示入参不是可识别的 pixiv 图片地址。
-	ErrImageURLNotRecognized = errors.New("pixiv: client: 不是可识别的 pixiv 图片地址")
+	// ErrImageURLNotRecognized 表示入参不是可识别的 pixiv 图片或动图 zip 地址。
+	ErrImageURLNotRecognized = errors.New("pixiv: client: 不是可识别的 pixiv 图片或动图 zip 地址")
 	// ErrImageRejected 表示服务端以非成功状态码拒绝了这次请求。
 	ErrImageRejected = errors.New("pixiv: client: 图片请求被拒绝")
 	// ErrImageHostUnreachable 表示主机不可达或无法解析。
@@ -28,8 +28,8 @@ var (
 // 该要求无法从图片 URL 推知，因此由本方法代为附加；调用者已设置时不覆盖。
 const imageFetchReferer = "https://www.pixiv.net/"
 
-// FetchImage 取回图片内容，返回可读的响应，由调用者自行消费——写文件、
-// 解码、计算哈希或流式处理皆可。
+// FetchImage 取回图片或动图 zip 的内容，返回可读的响应，由调用者自行消费——
+// 写文件、解码、计算哈希或流式处理皆可。
 //
 // 它处理调用者无从得知的部分：
 //
@@ -38,11 +38,14 @@ const imageFetchReferer = "https://www.pixiv.net/"
 //     地址不可识别（[ErrImageURLNotRecognized]）、请求被拒绝（[ErrImageRejected]）、
 //     主机不可达或解析失败（[ErrImageHostUnreachable]）。底层原因保留在错误里。
 //
+// 动图 zip 地址（img-zip-ugoira 路径段，来自 [FetchUgoiraMeta] 之类元数据接口）
+// 与图片同主机、同样要求 Referer，因此一并由此方法取回。
+//
 // 主机与其接入方式由客户端的传输决定（默认传输会按主机选用合适的方式），
 // 本方法不做这套判断，也不复制一份主机清单。
 //
 // 响应体未被转码或重新压缩，字节与源站返回的一致，因此可据其校验哈希；
-// 图片格式从响应的 Content-Type 读取，不要按 URL 扩展名推断（原图尤甚）。
+// 内容格式从响应的 Content-Type 读取，不要按 URL 扩展名推断（原图尤甚）。
 // 响应体由调用者负责关闭；失败路径下响应体已由本方法关闭，并从返回值中移除，
 // 因此无需（也无法）再关闭一次。
 //
@@ -78,14 +81,15 @@ func (c *Client) FetchImage(ctx context.Context, imageURL string) (*http.Respons
 	return resp, nil
 }
 
-// checkImageURL 在发出请求前拒绝不是图片地址的入参，使调用者尽早发现传错了参数。
+// checkImageURL 在发出请求前拒绝不是 pixiv CDN 资源地址（图片或动图 zip）的
+// 入参，使调用者尽早发现传错了参数。
 //
-// 判断「是不是图片」的路径布局知识由 [image.IsImageURL] 持有，本包不重复一份，
-// 以免两处清单各自漂移。这里只把布尔结论转成调用者可读的错误。
+// 判断「是不是可取资源」的路径布局知识由 [image.IsImageURL] 持有，本包不重复
+// 一份，以免两处清单各自漂移。这里只把布尔结论转成调用者可读的错误。
 func checkImageURL(imageURL string) error {
 	if image.IsImageURL(imageURL) {
 		return nil
 	}
-	return fmt.Errorf("%w: %s 的路径不是 pixiv 图片地址（应为 %s 之一）",
+	return fmt.Errorf("%w: %s 的路径不是 pixiv 图片或动图 zip 地址（应为 %s 之一）",
 		ErrImageURLNotRecognized, imageURL, strings.Join(image.PathSegments(), " / "))
 }

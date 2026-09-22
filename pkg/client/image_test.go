@@ -176,6 +176,8 @@ func TestFetchImageAcceptsEverySizeURL(t *testing.T) {
 		{"带缩放的小说封面", "/c/600x600/novel-cover-master/img/2026/09/07/00/00/12/149365161_p0_master1200.jpg"},
 		{"作者头像", "/user-profile/img/2026/09/07/00/00/12/23368434_0daa45f98a51e102a4ef48411bffe087_50.jpg"},
 		{"用户背景图", "/background/img/2026/09/07/00/00/12/23368434_abc.jpg"},
+		{"动图压缩版 zip", "/img-zip-ugoira/img/2026/09/07/00/00/12/149365161_p0_ugoira600x600.zip"},
+		{"动图原图 zip", "/img-zip-ugoira/img/2026/09/07/00/00/12/149365161_p0_ugoira1920x1080.zip"},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
 			resp, err := c.FetchImage(context.Background(), server.URL+tt.path)

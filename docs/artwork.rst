@@ -193,3 +193,49 @@ original
     类型: string
 
     原始图像地址。
+
+画作动图元数据
+=================
+
+仅对动态作品（illustType=2）有效，其它类型该接口返回错误。
+
+地址: ``https://www.pixiv.net/ajax/illust/<作品ID>/ugoira_meta``
+
+[body]
+
+src
+
+    类型: string
+
+    压缩版动图 zip 地址（通常为 600x600），未登录时通常可用的兜底。
+
+originalSrc
+
+    类型: string
+
+    原分辨率动图 zip 地址，取回通常需要登录。
+
+mime_type
+
+    类型: string
+
+    动图格式，如 image/gif。
+
+[body.frames]
+
+    帧数据列表，按播放顺序排列。
+
+file
+
+    类型: string
+
+    帧在 zip 内的文件名。
+
+delay
+
+    类型: number
+
+    该帧显示时长，单位毫秒。
+
+下载动图即取回 src / originalSrc 指向的 zip：zip 与图片同主机、同样要求
+Referer，经 ``Client.FetchImage`` 取回即可。

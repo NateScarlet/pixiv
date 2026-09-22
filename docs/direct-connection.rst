@@ -70,7 +70,7 @@
   * - 错误
     - 含义
   * - ``ErrImageURLNotRecognized``
-    - 入参不是可识别的 pixiv 图片地址，未发出请求
+    - 入参不是可识别的 pixiv 图片或动图 zip 地址，未发出请求
   * - ``ErrImageRejected``
     - 服务端以非 200 状态码拒绝（错误文本含该状态码）
   * - ``ErrImageHostUnreachable``
@@ -78,7 +78,8 @@
 
 可取的地址由 ``image.IsImageURL`` 判读，按路径段识别，因此除画作各尺寸外，
 小说封面、作者头像（``AuthorProfileImageURL()``）、用户背景图等
-不具备各尺寸结构的图片地址同样可直接传入。该判读只看协议与路径，
+不具备各尺寸结构的图片地址，以及动图 zip 地址（``img-zip-ugoira`` 路径段，
+取自 ``ugoira_meta`` 接口），同样可直接传入。该判读只看协议与路径，
 不校验主机名：主机可达性由请求结果回答，且按主机校验会让本地端点
 （测试用的 ``httptest`` 服务）无法被识别。
 

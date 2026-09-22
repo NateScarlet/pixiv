@@ -162,6 +162,26 @@ for i, page := range slices.Collect(pages.Pages()) {
     }
 }
 
+// 下载动图 (动画插图): 先取元数据得到 zip 地址与帧时序, 再经 FetchImage
+// 取回 zip (与图片同主机、同样要求 Referer)。帧的 file 与 delay 供调用者
+// 自行解压与拼装 (如转成 GIF 时给出每帧时长)。
+meta, err := artwork.FetchUgoiraMeta(ctx, "44332434")
+if err == nil {
+    fmt.Println("动图格式:", meta.MimeType(), "帧数:", len(slices.Collect(meta.Frames())))
+    zipResp, err := client.For(ctx).FetchImage(ctx, meta.ZipURL())
+    if err == nil {
+        f, err := os.Create("44332434_ugoira.zip")
+        if err == nil {
+            _, err = io.Copy(f, zipResp.Body)
+            zipResp.Body.Close()
+            f.Close()
+            if err != nil {
+                fmt.Println("写入失败:", err)
+            }
+        }
+    }
+}
+
 // 搜索小说 (不可变记录, 已知字段方法 + Raw() 获取未建模字段)
 payload, _ := novel.SearchV2(ctx, "パチュリー・ノーレッジ")
 for item := range payload.Items() {

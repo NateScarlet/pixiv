@@ -96,9 +96,9 @@ func TestFromURLKeepsHostAndScheme(t *testing.T) {
 	require.True(t, strings.HasPrefix(got.Regular, "http://i.pximg.net/"))
 }
 
-// TestIsImageURL 断言图片地址判读按路径段进行：
-// 接受库自身会交给调用者的各类图片地址（含不具备各尺寸结构的小说封面、
-// 头像、背景图），拒绝非图片地址。
+// TestIsImageURL 断言地址判读按路径段进行：
+// 接受库自身会交给调用者的各类地址（含不具备各尺寸结构的小说封面、
+// 头像、背景图与动图 zip），拒绝非 pixiv CDN 资源地址。
 func TestIsImageURL(t *testing.T) {
 	for _, tt := range []struct {
 		name string
@@ -113,6 +113,8 @@ func TestIsImageURL(t *testing.T) {
 		{"带缩放的小说封面", "https://i.pximg.net/c/600x600/novel-cover-master/img/2021/01/10/22/59/38/14443124_77_master1200.jpg", true},
 		{"作者头像", "https://i.pximg.net/user-profile/img/2022/09/23/01/34/52/23368434_0daa45f98a51e102a4ef48411bffe087_50.jpg", true},
 		{"用户背景图", "https://i.pximg.net/background/img/2021/01/10/22/47/21/abc.jpg", true},
+		{"动图压缩版 zip", "https://i.pximg.net/img-zip-ugoira/img/2026/09/07/00/00/12/149365161_p0_ugoira600x600.zip", true},
+		{"动图原图 zip", "https://i.pximg.net/img-zip-ugoira/img/2026/09/07/00/00/12/149365161_p0_ugoira1920x1080.zip", true},
 		{"http 亦可", "http://i.pximg.net/c/48x48/img-master/img/2026/08/26/00/00/29/1_p0_square1200.jpg", true},
 		{"画作页面", "https://www.pixiv.net/artworks/149365161", false},
 		{"API 地址", "https://www.pixiv.net/ajax/illust/149365161", false},
@@ -156,9 +158,10 @@ func TestIsImageURLAndFromURLCoverDifferentSets(t *testing.T) {
 		{"小说封面", "https://i.pximg.net/novel-cover-original/img/2021/01/10/22/47/21/tei14736_2b060b6d13271530d5439f9dbdfe81af.png", false},
 		{"作者头像", "https://i.pximg.net/user-profile/img/2022/09/23/01/34/52/23368434_0daa45f98a51e102a4ef48411bffe087_50.jpg", false},
 		{"用户背景图", "https://i.pximg.net/background/img/2021/01/10/22/47/21/abc.jpg", false},
+		{"动图 zip", "https://i.pximg.net/img-zip-ugoira/img/2026/09/07/00/00/12/149365161_p0_ugoira600x600.zip", false},
 	} {
 		t.Run(tt.name, func(t *testing.T) {
-			require.True(t, IsImageURL(tt.in), "应被识别为图片")
+			require.True(t, IsImageURL(tt.in), "应被识别为可取回的 pixiv CDN 资源")
 			_, err := FromURL(tt.in)
 			if tt.rebuildable {
 				require.NoError(t, err, "画作类地址应有各尺寸结构")

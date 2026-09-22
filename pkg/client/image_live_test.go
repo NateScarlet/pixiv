@@ -27,6 +27,9 @@ const (
 	liveImageMiniURL     = "https://i.pximg.net/c/48x48/img-master/img/2026/09/07/00/00/12/149365161_p0_square1200.jpg"
 	// AuthorProfileImageURL() 一类访问器交给调用者的地址（实测取自排行榜响应）。
 	liveImageProfileURL = "https://i.pximg.net/user-profile/img/2022/09/23/01/34/52/23368434_0daa45f98a51e102a4ef48411bffe087_50.jpg"
+	// liveUgoiraZipURL 是真实动图作品（44332434）的压缩版 zip 地址，实测取自
+	// 其 ugoira_meta 接口（src 字段），路径段为 img-zip-ugoira。
+	liveUgoiraZipURL = "https://i.pximg.net/img-zip-ugoira/img/2014/06/27/00/20/58/44332434_ugoira600x600.zip"
 )
 
 // TestFetchImageLive 断言真实图片主机上取回成功：
@@ -124,4 +127,24 @@ func TestFetchImageLiveAuthorProfileURL(t *testing.T) {
 	got, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
 	assert.NotEmpty(t, got)
+}
+
+// TestFetchImageLiveUgoiraZip 断言动图 zip 与图片一样可经本方法取回：
+// 路径段 img-zip-ugoira 被识别，自动携带 Referer 后源站返回 200 与 zip 内容。
+func TestFetchImageLiveUgoiraZip(t *testing.T) {
+	testenv.RequireLive(t)
+	c := New()
+
+	resp, err := c.FetchImage(context.Background(), liveUgoiraZipURL)
+	require.NoError(t, err, "动图 zip 应可取回")
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "application/zip", resp.Header.Get("Content-Type"))
+
+	got, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.NotEmpty(t, got)
+	if cl := resp.Header.Get("Content-Length"); cl != "" {
+		assert.Equal(t, cl, strconv.Itoa(len(got)), "头存在时字节数应与之一致")
+	}
 }
