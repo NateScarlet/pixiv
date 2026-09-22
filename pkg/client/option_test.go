@@ -415,6 +415,25 @@ func TestDNSQueryURLInvalidFragmentPanics(t *testing.T) {
 		func() { defaultDNSResolver() })
 }
 
+// TestDNSQueryURLSelectsResolver 断言 PIXIV_DNS_QUERY_URL 的 scheme 选择解析方式。
+//
+// 本用例在环境变量这一接缝上钉住 scheme 分派：dns: 走系统解析。若该值仍被
+// 交给 DoH 解析器，会因缺少主机名而在构造期 panic，因此「能解析出 localhost」
+// 足以说明分派确实发生在 scheme 上。
+func TestDNSQueryURLSelectsResolver(t *testing.T) {
+	t.Setenv("PIXIV_DNS_QUERY_URL", "dns:")
+	ips, err := defaultDNSResolver().Resolve(context.Background(), "localhost")
+	require.NoError(t, err)
+	assert.NotEmpty(t, ips)
+}
+
+// TestDNSQueryURLInvalidSchemePanics 断言端点写法非法时快速失败，
+// 而不是回落到默认值：静默回落会让写错配置的人以为设置在生效。
+func TestDNSQueryURLInvalidSchemePanics(t *testing.T) {
+	t.Setenv("PIXIV_DNS_QUERY_URL", "tls://1.1.1.1")
+	assert.Panics(t, func() { defaultDNSResolver() })
+}
+
 // resolverFunc 便于在测试中构造解析器。
 type resolverFunc func(ctx context.Context, host string) ([]net.IP, error)
 

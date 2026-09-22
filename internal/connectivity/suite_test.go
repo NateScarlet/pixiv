@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -20,10 +21,10 @@ import (
 // 套件并行调度探测，因此调用记录需要互斥：无保护的 append 会让并发
 // 调用互相覆盖，断言看到的调用清单随机缺项。
 type fakeProber struct {
-	doh   func(ctx context.Context, endpoint, host string, viaProxy bool) ([]net.IP, error)
-	https func(ctx context.Context, rawURL string, viaProxy bool) error
-	ech   func(ctx context.Context, host string) error
-	noSNI func(ctx context.Context, host string) error
+	resolve func(ctx context.Context, endpoint, host string, viaProxy bool) ([]net.IP, error)
+	https   func(ctx context.Context, rawURL string, viaProxy bool) error
+	ech     func(ctx context.Context, host string) error
+	noSNI   func(ctx context.Context, host string) error
 
 	mu    sync.Mutex
 	calls []string
@@ -43,12 +44,12 @@ func (f *fakeProber) recordedCalls() []string {
 	return append([]string(nil), f.calls...)
 }
 
-func (f *fakeProber) ProbeDoH(ctx context.Context, endpoint, host string, viaProxy bool) ([]net.IP, error) {
-	f.recordCall("doh:%v:%s:%s", viaProxy, endpoint, host)
-	if f.doh == nil {
-		return nil, errors.New("未预期的 ProbeDoH 调用")
+func (f *fakeProber) ProbeResolver(ctx context.Context, endpoint, host string, viaProxy bool) ([]net.IP, error) {
+	f.recordCall("resolve:%v:%s:%s", viaProxy, endpoint, host)
+	if f.resolve == nil {
+		return nil, errors.New("未预期的 ProbeResolver 调用")
 	}
-	return f.doh(ctx, endpoint, host, viaProxy)
+	return f.resolve(ctx, endpoint, host, viaProxy)
 }
 
 func (f *fakeProber) ProbeHTTPS(ctx context.Context, rawURL string, viaProxy bool) error {
@@ -78,9 +79,9 @@ func (f *fakeProber) ProbeNoSNI(ctx context.Context, host string) error {
 // testEnv 构造测试环境：withProxy 决定是否配置了 HTTPS_PROXY。
 func testEnv(withProxy bool) Environment {
 	env := Environment{
-		GoVersion:            "go1.26.0",
-		DoHQueryURL:          "https://1.1.1.1/dns-query",
-		DoHQueryURLIsDefault: true,
+		GoVersion:                 "go1.26.0",
+		ResolverEndpoint:          "https://1.1.1.1/dns-query",
+		ResolverEndpointIsDefault: true,
 	}
 	if withProxy {
 		env.HTTPSProxyRaw = "http://127.0.0.1:7890"
@@ -99,7 +100,7 @@ func runSuite(t *testing.T, env Environment, p Prober) Report {
 // 漏传字段的调用者得到的是有意义的探测，而不是空报告。
 func TestSuiteZeroValueUsesDefaultHosts(t *testing.T) {
 	p := &fakeProber{
-		doh: func(context.Context, string, string, bool) ([]net.IP, error) {
+		resolve: func(context.Context, string, string, bool) ([]net.IP, error) {
 			return []net.IP{net.ParseIP("210.140.139.129")}, nil
 		},
 		ech:   func(context.Context, string) error { return nil },
@@ -116,11 +117,34 @@ func TestSuiteZeroValueUsesDefaultHosts(t *testing.T) {
 	assert.NotEmpty(t, rep.Checks)
 }
 
+// TestSuiteSkipsProxyProbeForNonHTTPEndpoint 断言解析方式不经 HTTP 时
+// 不发起经代理的解析探测：明文 DNS 走 UDP、系统解析走平台 API，都没有
+// 可经代理的路径，发起这种探测只会产出必然失败的噪音。
+func TestSuiteSkipsProxyProbeForNonHTTPEndpoint(t *testing.T) {
+	p := &fakeProber{
+		resolve: func(context.Context, string, string, bool) ([]net.IP, error) {
+			return []net.IP{net.ParseIP("210.140.139.129")}, nil
+		},
+		ech:   func(context.Context, string) error { return nil },
+		noSNI: func(context.Context, string) error { return nil },
+		https: func(context.Context, string, bool) error { return nil },
+	}
+	env := testEnv(true)
+	env.ResolverEndpoint = "dns://1.1.1.1"
+	runSuite(t, env, p)
+
+	for _, c := range p.recordedCalls() {
+		if strings.HasPrefix(c, "resolve:") {
+			assert.NotContains(t, c, ":true:", "不经 HTTP 的解析端点不应探测代理路径: %s", c)
+		}
+	}
+}
+
 // TestSuiteProbesProxyOnlyWhenConfigured 断言未配置代理时不发起任何经代理的探测：
 // 那些探测必然失败，执行它们只会产出噪音。
 func TestSuiteProbesProxyOnlyWhenConfigured(t *testing.T) {
 	p := &fakeProber{
-		doh: func(context.Context, string, string, bool) ([]net.IP, error) {
+		resolve: func(context.Context, string, string, bool) ([]net.IP, error) {
 			return []net.IP{net.ParseIP("210.140.139.129")}, nil
 		},
 		ech:   func(context.Context, string) error { return nil },
@@ -140,10 +164,10 @@ func TestSuiteProbesProxyOnlyWhenConfigured(t *testing.T) {
 }
 
 // TestSuiteProbesProxyWhenConfigured 断言配置了 HTTPS_PROXY 时，
-// DoH 与各主机都会额外探测经代理的路径——这是「数据是否需要代理」结论的依据。
+// 解析端点与各主机都会额外探测经代理的路径——这是「数据是否需要代理」结论的依据。
 func TestSuiteProbesProxyWhenConfigured(t *testing.T) {
 	p := &fakeProber{
-		doh: func(context.Context, string, string, bool) ([]net.IP, error) {
+		resolve: func(context.Context, string, string, bool) ([]net.IP, error) {
 			return []net.IP{net.ParseIP("210.140.139.129")}, nil
 		},
 		ech:   func(context.Context, string) error { return nil },
@@ -152,16 +176,16 @@ func TestSuiteProbesProxyWhenConfigured(t *testing.T) {
 	}
 	runSuite(t, testEnv(true), p)
 
-	assert.Contains(t, p.recordedCalls(), "doh:true:https://1.1.1.1/dns-query:i.pximg.net")
+	assert.Contains(t, p.recordedCalls(), "resolve:true:https://1.1.1.1/dns-query:i.pximg.net")
 	assert.Contains(t, p.recordedCalls(), "https:true:https://www.pixiv.net/")
 	assert.Contains(t, p.recordedCalls(), "https:true:https://i.pximg.net/")
 }
 
-// TestSuiteDoHQueriedForImageHost 断言 DoH 探测查询的是图片主机：
+// TestSuiteResolverQueriedForImageHost 断言解析探测查询的是图片主机：
 // 它同时是后续无 SNI 直连要解析的名字，查询它即可验证端点可用。
-func TestSuiteDoHQueriedForImageHost(t *testing.T) {
+func TestSuiteResolverQueriedForImageHost(t *testing.T) {
 	p := &fakeProber{
-		doh: func(_ context.Context, _ string, host string, _ bool) ([]net.IP, error) {
+		resolve: func(_ context.Context, _ string, host string, _ bool) ([]net.IP, error) {
 			require.Equal(t, "i.pximg.net", host)
 			return []net.IP{net.ParseIP("210.140.139.129")}, nil
 		},
@@ -171,7 +195,7 @@ func TestSuiteDoHQueriedForImageHost(t *testing.T) {
 	}
 	runSuite(t, testEnv(false), p)
 
-	assert.Contains(t, p.recordedCalls(), "doh:false:https://1.1.1.1/dns-query:i.pximg.net")
+	assert.Contains(t, p.recordedCalls(), "resolve:false:https://1.1.1.1/dns-query:i.pximg.net")
 }
 
 // TestVerdictFullyDirect 断言 ECH 与无 SNI 直连都成功、常规直连被封锁时，
@@ -179,7 +203,7 @@ func TestSuiteDoHQueriedForImageHost(t *testing.T) {
 // 常规直连失败不妨碍 AutoTransport 可用。
 func TestVerdictFullyDirect(t *testing.T) {
 	p := &fakeProber{
-		doh: func(_ context.Context, _ string, _ string, viaProxy bool) ([]net.IP, error) {
+		resolve: func(_ context.Context, _ string, _ string, viaProxy bool) ([]net.IP, error) {
 			if viaProxy {
 				return nil, errors.New("未配置代理")
 			}
@@ -204,12 +228,12 @@ func TestVerdictFullyDirect(t *testing.T) {
 	assert.False(t, rep.API.ViaProxy, "未配置代理时不应报告代理路径")
 }
 
-// TestVerdictDoHNeedsProxy 断言配置了代理、DoH 直连失败而经代理成功时，
-// 结论明确指出 DoH 需要经过代理，且运行时默认配置已自动满足（DoH 走
-// http.DefaultClient，遵循 HTTPS_PROXY）。
-func TestVerdictDoHNeedsProxy(t *testing.T) {
+// TestVerdictResolverNeedsProxy 断言配置了代理、解析直连失败而经代理成功时，
+// 结论明确指出解析需要经过代理，且运行时默认配置已自动满足（解析查询经
+// http.DefaultClient 发出，遵循 HTTPS_PROXY）。
+func TestVerdictResolverNeedsProxy(t *testing.T) {
 	p := &fakeProber{
-		doh: func(_ context.Context, _ string, _ string, viaProxy bool) ([]net.IP, error) {
+		resolve: func(_ context.Context, _ string, _ string, viaProxy bool) ([]net.IP, error) {
 			if viaProxy {
 				return []net.IP{net.ParseIP("210.140.139.129")}, nil
 			}
@@ -227,17 +251,17 @@ func TestVerdictDoHNeedsProxy(t *testing.T) {
 	rep := runSuite(t, testEnv(true), p)
 
 	v := rep.Verdict()
-	assert.Equal(t, LevelDirect, v.Level, "数据路径可直连，DoH 的代理需求不改变直连结论")
-	assert.Contains(t, v.Text, "DoH")
+	assert.Equal(t, LevelDirect, v.Level, "数据路径可直连，解析的代理需求不改变直连结论")
+	assert.Contains(t, v.Text, "解析")
 	assert.Contains(t, v.Text, "代理")
-	assert.True(t, rep.DoH.NeedsProxy())
+	assert.True(t, rep.Resolver.NeedsProxy())
 }
 
-// TestVerdictDoHUsableWithoutProxy 断言配置了代理但 DoH 直连成功时，
-// 结论明确说明 DoH 无需经过代理——这是用户要求的三项判定之一。
-func TestVerdictDoHUsableWithoutProxy(t *testing.T) {
+// TestVerdictResolverUsableWithoutProxy 断言配置了代理但解析直连成功时，
+// 结论明确说明解析无需经过代理——这是用户要求的三项判定之一。
+func TestVerdictResolverUsableWithoutProxy(t *testing.T) {
 	p := &fakeProber{
-		doh: func(context.Context, string, string, bool) ([]net.IP, error) {
+		resolve: func(context.Context, string, string, bool) ([]net.IP, error) {
 			return []net.IP{net.ParseIP("210.140.139.129")}, nil
 		},
 		ech:   func(context.Context, string) error { return nil },
@@ -248,15 +272,15 @@ func TestVerdictDoHUsableWithoutProxy(t *testing.T) {
 
 	v := rep.Verdict()
 	assert.Equal(t, LevelDirect, v.Level)
-	assert.False(t, rep.DoH.NeedsProxy())
-	assert.Contains(t, v.Text, "DoH")
+	assert.False(t, rep.Resolver.NeedsProxy())
+	assert.Contains(t, v.Text, "解析")
 }
 
 // TestVerdictDataNeedsProxy 断言直连全失败、经代理可达时，
 // 结论是「数据传输需要经过代理」，且 AutoTransport 仍可用。
 func TestVerdictDataNeedsProxy(t *testing.T) {
 	p := &fakeProber{
-		doh: func(_ context.Context, _ string, _ string, viaProxy bool) ([]net.IP, error) {
+		resolve: func(_ context.Context, _ string, _ string, viaProxy bool) ([]net.IP, error) {
 			if viaProxy {
 				return []net.IP{net.ParseIP("210.140.139.129")}, nil
 			}
@@ -285,7 +309,7 @@ func TestVerdictDataNeedsProxy(t *testing.T) {
 // 并指明需要代理的是哪一类。
 func TestVerdictPartial(t *testing.T) {
 	p := &fakeProber{
-		doh: func(_ context.Context, _ string, _ string, viaProxy bool) ([]net.IP, error) {
+		resolve: func(_ context.Context, _ string, _ string, viaProxy bool) ([]net.IP, error) {
 			if viaProxy {
 				return []net.IP{net.ParseIP("210.140.139.129")}, nil
 			}
@@ -314,7 +338,7 @@ func TestVerdictPartial(t *testing.T) {
 // 结论是「不可用」：AutoTransport 没有任何可用路径。
 func TestVerdictUnavailableWithoutProxy(t *testing.T) {
 	p := &fakeProber{
-		doh: func(context.Context, string, string, bool) ([]net.IP, error) {
+		resolve: func(context.Context, string, string, bool) ([]net.IP, error) {
 			return nil, errors.New("connection refused")
 		},
 		ech:   func(context.Context, string) error { return errors.New("ECH 自举失败") },
@@ -332,7 +356,7 @@ func TestVerdictUnavailableWithoutProxy(t *testing.T) {
 // 且报告中包含代理路径失败的探测记录。
 func TestVerdictUnavailableWithProxy(t *testing.T) {
 	p := &fakeProber{
-		doh: func(context.Context, string, string, bool) ([]net.IP, error) {
+		resolve: func(context.Context, string, string, bool) ([]net.IP, error) {
 			return nil, errors.New("connection refused")
 		},
 		ech:   func(context.Context, string) error { return errors.New("ECH 自举失败") },
@@ -350,7 +374,7 @@ func TestVerdictUnavailableWithProxy(t *testing.T) {
 // TestSuiteProbesConcurrently 断言各探测并行执行：全部探测都到达屏障后才放行，
 // 若串行执行则永远到不齐、只能在套件超时后失败。
 func TestSuiteProbesConcurrently(t *testing.T) {
-	// 无代理环境的任务数：1 次 DoH + 2 台 API 主机 × 2 方式 + 1 台图片主机 × 2 方式。
+	// 无代理环境的任务数：1 次解析 + 2 台 API 主机 × 2 方式 + 1 台图片主机 × 2 方式。
 	const taskCount = 7
 
 	arrived := make(chan struct{}, taskCount)
@@ -371,7 +395,7 @@ func TestSuiteProbesConcurrently(t *testing.T) {
 		}
 	}
 	p := &fakeProber{
-		doh: func(_ context.Context, _, _ string, _ bool) ([]net.IP, error) {
+		resolve: func(_ context.Context, _, _ string, _ bool) ([]net.IP, error) {
 			return []net.IP{net.ParseIP("210.140.139.129")}, barrier(context.Background())
 		},
 		ech: func(ctx context.Context, _ string) error { return barrier(ctx) },
@@ -394,7 +418,7 @@ func TestSuiteProbesConcurrently(t *testing.T) {
 // 且错误说明是探测超时而不是含糊的底层错误。
 func TestSuiteProbeTimeoutLimitsEachProbe(t *testing.T) {
 	p := &fakeProber{
-		doh: func(context.Context, string, string, bool) ([]net.IP, error) {
+		resolve: func(context.Context, string, string, bool) ([]net.IP, error) {
 			return []net.IP{net.ParseIP("210.140.139.129")}, nil
 		},
 		ech: func(context.Context, string) error {

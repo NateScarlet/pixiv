@@ -18,10 +18,22 @@ PIXIV_USER_AGENT
 
 PIXIV_DNS_QUERY_URL
 
-  免代理所需要的 DNS over HTTPS 使用的服务网址。
+  本库自行解析主机名时使用的解析方式，由取值的 URL scheme 声明。
   等价于 ``client.WithDNSResolver`` 注入一个使用该地址的解析器。
 
-  默认按 `RFC 8484 <https://www.rfc-editor.org/rfc/rfc8484>`_ 的二进制报文接口查询
+  可用写法：
+
+  - ``http(s)://…`` —— DNS over HTTPS，查询方式由 fragment 声明（见下）。
+
+  - ``dns://<ip>[:port]`` —— 明文 DNS，把查询发往该服务器，端口缺省 53。
+    只接受 IP 字面量（IPv6 写成 ``dns://[::1]:53``）。指定主机名等于又依赖
+    一次解析，而本变量的用途正是绕开系统 DNS。
+
+  - ``dns:`` 或 ``dns://`` —— 系统解析，与 ``client.WithDNSResolver(nil)`` 同义。
+
+  默认值 ``https://1.1.1.1/dns-query`` 不变，因此不设置时行为与以往一致。
+
+  DoH 默认按 `RFC 8484 <https://www.rfc-editor.org/rfc/rfc8484>`_ 的二进制报文接口查询
   （``GET`` + ``dns`` 参数携带 base64url 编码的 DNS 报文，``Accept: application/dns-message``）。
   这是标准要求实现必须支持的接口，符合标准的服务端都能用。
 
@@ -33,7 +45,11 @@ PIXIV_DNS_QUERY_URL
   fragment 只用于向本库声明查询方式，不会发往服务端。
   声明非法（如 ``#type=binary``、``#json``）时构造客户端会 panic，
   而不是静默回落——静默回落会得到一个「端点拒绝查询」的错误，
-  掩盖网址写错这个真实原因。
+  掩盖网址写错这个真实原因。明文 DNS 方式没有 fragment 这个概念，
+  在 ``dns://`` 上写 ``#type=…`` 同样会在构造期报错。
+
+  写法非法（缺少 scheme、未知 scheme、``dns:1.1.1.1`` 漏写 ``//``、
+  ``dns://`` 后接主机名）时构造客户端会 panic，并给出正确写法。
 
   部分可用 DoH 服务网址：
 

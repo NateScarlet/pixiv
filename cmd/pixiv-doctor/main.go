@@ -4,13 +4,13 @@
 //
 //  1. 环境多大程度上可以直连（ECH / 无 SNI / 常规）；
 //  2. AutoTransport（库的默认传输）是否可链接；
-//  3. 配置了 HTTPS_PROXY 时，DoH 查询与数据传输（API / 图片）是否需要经过代理。
+//  3. 配置了 HTTPS_PROXY 时，解析查询与数据传输（API / 图片）是否需要经过代理。
 //
 // 用法:
 //
 //	pixiv-doctor
 //
-// 环境变量与库一致：PIXIV_DNS_QUERY_URL 选择 DoH 端点，
+// 环境变量与库一致：PIXIV_DNS_QUERY_URL 选择解析端点，
 // HTTPS_PROXY 声明代理（其存在会触发额外的代理路径探测）。
 package main
 
@@ -32,7 +32,7 @@ import (
 // ——诊断输出本身是成功的结果，退出码供调用方区分的是工具自身是否运行。
 func main() {
 	env := buildEnvironment()
-	resolver := dns.NewDOHResolver(env.DoHQueryURL)
+	resolver := dns.NewResolver(env.ResolverEndpoint)
 	suite := connectivity.Suite{}
 	prober := connectivity.NewLiveProber(env.ProxyURL, resolver)
 
@@ -63,10 +63,10 @@ func buildEnvironment() connectivity.Environment {
 		env.ProxyURL = u
 	}
 
-	env.DoHQueryURL = os.Getenv("PIXIV_DNS_QUERY_URL")
-	if env.DoHQueryURL == "" {
-		env.DoHQueryURL = client.DefaultDNSQueryURL
-		env.DoHQueryURLIsDefault = true
+	env.ResolverEndpoint = os.Getenv("PIXIV_DNS_QUERY_URL")
+	if env.ResolverEndpoint == "" {
+		env.ResolverEndpoint = client.DefaultDNSQueryURL
+		env.ResolverEndpointIsDefault = true
 	}
 	return env
 }

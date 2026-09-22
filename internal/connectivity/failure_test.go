@@ -66,12 +66,12 @@ func TestStatusErrorTakesPrecedenceOverNetwork(t *testing.T) {
 // 用户若把端点写成 #type=json 就会得到 400。用户需要知道要改声明的编码方式。
 func TestDohClauseReportsRejection(t *testing.T) {
 	r := Report{
-		DoH: DoHReport{
+		Resolver: ResolverReport{
 			Endpoint:  "https://doh.home.arpa:3443/dns-query#type=json",
 			DirectErr: &dns.StatusError{StatusCode: 400, Status: "Bad Request"},
 		},
 	}
-	clause := r.dohClause()
+	clause := r.resolverClause()
 	assert.Contains(t, clause, "拒绝了查询")
 	assert.Contains(t, clause, "#type=", "应指出可操作的处置方式")
 	assert.NotContains(t, clause, "不可达", "端点可达，不应说成不可达")
@@ -80,12 +80,12 @@ func TestDohClauseReportsRejection(t *testing.T) {
 // TestDohClauseReportsUnreachable 断言真正的连接失败仍报为不可达。
 func TestDohClauseReportsUnreachable(t *testing.T) {
 	r := Report{
-		DoH: DoHReport{
+		Resolver: ResolverReport{
 			Endpoint:  "https://1.1.1.1/dns-query",
 			DirectErr: &net.OpError{Op: "dial", Err: errors.New("connection refused")},
 		},
 	}
-	clause := r.dohClause()
+	clause := r.resolverClause()
 	assert.Contains(t, clause, "不可达")
 	assert.NotContains(t, clause, "#type=", "网络问题不应建议改编码方式声明")
 }
@@ -93,14 +93,14 @@ func TestDohClauseReportsUnreachable(t *testing.T) {
 // TestDohClauseReportsCertFailure 断言证书失败单独归因并指出处置方向。
 func TestDohClauseReportsCertFailure(t *testing.T) {
 	r := Report{
-		DoH: DoHReport{
+		Resolver: ResolverReport{
 			Endpoint: "https://doh.example/dns-query",
 			DirectErr: &tls.CertificateVerificationError{
 				Err: errors.New("x509: certificate signed by unknown authority"),
 			},
 		},
 	}
-	clause := r.dohClause()
+	clause := r.resolverClause()
 	assert.Contains(t, clause, "证书")
 	assert.Contains(t, clause, "信任")
 }
@@ -110,12 +110,12 @@ func TestDohClauseReportsCertFailure(t *testing.T) {
 func TestDohClausePrefersDirectError(t *testing.T) {
 	r := Report{
 		Env: testEnv(true),
-		DoH: DoHReport{
+		Resolver: ResolverReport{
 			DirectErr: &dns.StatusError{StatusCode: 400, Status: "Bad Request"},
 			ProxyErr:  errors.New("代理不可用"),
 		},
 	}
-	clause := r.dohClause()
+	clause := r.resolverClause()
 	assert.Contains(t, clause, "拒绝了查询")
 	assert.NotContains(t, clause, "代理不可用")
 }

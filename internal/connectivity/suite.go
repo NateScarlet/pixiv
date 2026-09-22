@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"github.com/NateScarlet/pixiv/pkg/client/dns"
 )
 
 // apiHosts 是要探测的 API 类主机（Cloudflare 托管，走 ECH 直连）。
@@ -77,34 +79,36 @@ func (s Suite) Run(ctx context.Context, env Environment, p Prober) Report {
 		tasks = append(tasks, t)
 	}
 
-	// #region 任务收集：DoH 与各主机的直连、代理路径
+	// #region 任务收集：解析端点与各主机的直连、代理路径
 	{
 		const probeHost = "i.pximg.net"
 		record(probeTask{
-			name: "DoH 查询（直连）", detail: env.DoHQueryURL,
+			name: "解析查询（直连）", detail: env.ResolverEndpoint,
 			run: func(ctx context.Context) error {
-				ips, err := p.ProbeDoH(ctx, env.DoHQueryURL, probeHost, false)
+				ips, err := p.ProbeResolver(ctx, env.ResolverEndpoint, probeHost, false)
 				// 解析结果只由直连查询产出；失败时 err 携带原因。
 				mu.Lock()
-				rep.DoH.Endpoint = env.DoHQueryURL
+				rep.Resolver.Endpoint = env.ResolverEndpoint
 				if err == nil {
-					rep.DoH.DirectOK = true
-					rep.DoH.Resolved = ips
+					rep.Resolver.DirectOK = true
+					rep.Resolver.Resolved = ips
 				} else {
-					rep.DoH.DirectErr = err
+					rep.Resolver.DirectErr = err
 				}
 				mu.Unlock()
 				return err
 			},
 		})
-		if env.ProxyURL != nil {
+		// 经代理的解析探测只对经 HTTP 查询的端点有意义：明文 DNS 走 UDP，
+		// 系统解析走平台 API，两者都不受进程代理环境变量影响。
+		if env.ProxyURL != nil && dns.EndpointUsesHTTP(env.ResolverEndpoint) {
 			record(probeTask{
-				name: "DoH 查询（经代理）", detail: env.DoHQueryURL,
+				name: "解析查询（经代理）", detail: env.ResolverEndpoint,
 				run: func(ctx context.Context) error {
-					_, err := p.ProbeDoH(ctx, env.DoHQueryURL, probeHost, true)
+					_, err := p.ProbeResolver(ctx, env.ResolverEndpoint, probeHost, true)
 					mu.Lock()
-					rep.DoH.ProxyOK = err == nil
-					rep.DoH.ProxyErr = err
+					rep.Resolver.ProxyOK = err == nil
+					rep.Resolver.ProxyErr = err
 					mu.Unlock()
 					return err
 				},

@@ -7,7 +7,7 @@
 //
 //  1. 环境多大程度上可以直连（ECH / 无 SNI / 常规）；
 //  2. AutoTransport 是否可链接（与运行时行为一致：任一方式可达即能用）；
-//  3. 配置了 HTTPS_PROXY 时，DoH 查询与数据传输（API / 图片）是否需要经过代理。
+//  3. 配置了 HTTPS_PROXY 时，解析查询与数据传输（API / 图片）是否需要经过代理。
 package connectivity
 
 import (
@@ -32,10 +32,10 @@ type Environment struct {
 	HTTPSProxyRaw string
 	// ProxyURL 是解析后的代理地址；nil 表示未配置代理。
 	ProxyURL *url.URL
-	// DoHQueryURL 是 PIXIV_DNS_QUERY_URL 的生效值。
-	DoHQueryURL string
-	// DoHQueryURLIsDefault 报告 DoH 端点是否为内置默认值（用户未配置）。
-	DoHQueryURLIsDefault bool
+	// ResolverEndpoint 是 PIXIV_DNS_QUERY_URL 的生效值。
+	ResolverEndpoint string
+	// ResolverEndpointIsDefault 报告解析端点是否为内置默认值（用户未配置）。
+	ResolverEndpointIsDefault bool
 }
 
 // Check 是一条探测记录，保留原始错误以供诊断。
@@ -53,9 +53,10 @@ func (c Check) OK() bool { return c.Err == nil }
 // Prober 提供单项探测能力，是网络实现的接缝；测试注入 fake，
 // 真实实现见 live.go。
 type Prober interface {
-	// ProbeDoH 用指定端点查询主机，返回 A 记录的解析结果。
-	// viaProxy 为 true 时强制经代理发出（仅环境配置了代理时被调用）。
-	ProbeDoH(ctx context.Context, endpoint, host string, viaProxy bool) ([]net.IP, error)
+	// ProbeResolver 用指定端点查询主机，返回 A 记录的解析结果。
+	// viaProxy 为 true 时强制经代理发出；仅「端点经 HTTP 查询」且环境配置了
+	// 代理时被调用——明文 DNS 与系统解析没有可经代理的出网路径。
+	ProbeResolver(ctx context.Context, endpoint, host string, viaProxy bool) ([]net.IP, error)
 	// ProbeHTTPS 以常规方式请求该地址；viaProxy 为 true 时强制经代理发出。
 	ProbeHTTPS(ctx context.Context, rawURL string, viaProxy bool) error
 	// ProbeECH 对 Cloudflare 托管主机施加 ECH 直连。
@@ -78,23 +79,24 @@ type HostReport struct {
 	ViaProxyErr error
 }
 
-// DoHReport 汇总 DoH 解析器的探测结果。
-type DoHReport struct {
+// ResolverReport 汇总解析端点的探测结果。
+type ResolverReport struct {
 	Endpoint string
 	// DirectOK 报告不经代理的查询是否成功。
 	DirectOK  bool
 	DirectErr error
 	// Resolved 是直连查询解析到的地址，用于对照「解析结果是否落在 pixiv 网段」。
 	Resolved []net.IP
-	// ProxyOK 报告经代理的查询是否成功；未配置代理时恒为 false。
+	// ProxyOK 报告经代理的查询是否成功；未配置代理、或解析方式不经 HTTP 时
+	// 恒为 false——那些情形下没有可经代理的出网路径。
 	ProxyOK  bool
 	ProxyErr error
 }
 
-// NeedsProxy 报告 DoH 查询是否需要经过代理：
+// NeedsProxy 报告解析查询是否需要经过代理：
 // 仅在「配置了代理、直连查询失败、经代理查询成功」三者同时成立时为 true。
 // 未配置代理时恒为 false——此时没有代理可走，「需要代理」无从谈起。
-func (r DoHReport) NeedsProxy() bool {
+func (r ResolverReport) NeedsProxy() bool {
 	return r.ProxyOK && !r.DirectOK
 }
 
@@ -151,19 +153,19 @@ func classifyFailure(err error) failureKind {
 	return failureUnreachable
 }
 
-// describeFailure 用一句话说明 DoH 失败的性质，供结论句使用。
+// describeFailure 用一句话说明解析失败的性质，供结论句使用。
 func describeFailure(err error) string {
 	switch classifyFailure(err) {
 	case failureTLS:
-		return "DoH 端点证书不被信任"
+		return "解析端点证书不被信任"
 	case failureRejected:
-		return "DoH 端点拒绝了查询（端点可达，但不接受这种查询）"
+		return "解析端点拒绝了查询（端点可达，但不接受这种查询）"
 	case failureUnparsable:
-		return "DoH 端点的响应无法解析"
+		return "解析端点的响应无法解析"
 	case failureUnreachable:
-		return "DoH 端点不可达"
+		return "解析端点不可达"
 	default:
-		return "DoH 查询失败"
+		return "解析查询失败"
 	}
 }
 
@@ -181,10 +183,10 @@ func hintFailure(err error) string {
 
 // Report 是一次探测的完整结果。
 type Report struct {
-	Env   Environment
-	DoH   DoHReport
-	API   HostReport
-	Image HostReport
+	Env      Environment
+	Resolver ResolverReport
+	API      HostReport
+	Image    HostReport
 	// Checks 是按执行顺序排列的全部探测记录，渲染为明细。
 	Checks []Check
 }
@@ -247,7 +249,7 @@ func (r Report) Verdict() Verdict {
 			v.Text = "没有可用路径：直连与代理均不可达，请检查代理地址与网络"
 		}
 	}
-	v.Text += "；" + r.dohClause()
+	v.Text += "；" + r.resolverClause()
 	if clause := r.dataProxyClause(); clause != "" {
 		v.Text += "；" + clause
 	}
@@ -265,34 +267,34 @@ func hostState(h HostReport) string {
 	return "没有可达路径"
 }
 
-// dohClause 用一句话描述 DoH 与代理的关系。
+// resolverClause 用一句话描述解析查询与代理的关系。
 //
 // 失败时按真实原因归因：「端点不可达」「证书不被信任」「端点拒绝了查询」
 // 是三件不同的事，混为一谈会把排查方向带偏。
-func (r Report) dohClause() string {
+func (r Report) resolverClause() string {
 	if r.Env.ProxyURL == nil {
-		if r.DoH.DirectOK {
-			return "DoH 直连可用"
+		if r.Resolver.DirectOK {
+			return "解析直连可用"
 		}
-		return dohFailureClause(r.DoH.DirectErr)
+		return resolverFailureClause(r.Resolver.DirectErr)
 	}
 	switch {
-	case r.DoH.NeedsProxy():
-		// DoH 走 http.DefaultClient，遵循 HTTPS_PROXY，当前配置已满足该需求。
-		return "DoH 需要经过代理（运行时已自动满足：DoH 查询遵循 HTTPS_PROXY）"
-	case r.DoH.DirectOK:
-		return "DoH 无需经过代理"
-	case r.DoH.ProxyOK:
-		return "DoH 直连不可用，经代理可用"
+	case r.Resolver.NeedsProxy():
+		// 经 HTTP 的解析查询走 http.DefaultClient，遵循 HTTPS_PROXY，当前配置已满足该需求。
+		return "解析需要经过代理（运行时已自动满足：DoH 查询遵循 HTTPS_PROXY）"
+	case r.Resolver.DirectOK:
+		return "解析无需经过代理"
+	case r.Resolver.ProxyOK:
+		return "解析直连不可用，经代理可用"
 	default:
 		// 两条路径都失败：直连的失败原因更能说明端点本身的问题
 		// （代理路径的失败可能只是代理不可用）。
-		return dohFailureClause(r.DoH.DirectErr)
+		return resolverFailureClause(r.Resolver.DirectErr)
 	}
 }
 
-// dohFailureClause 依据 DoH 失败的原因给出结论与处置建议。
-func dohFailureClause(err error) string {
+// resolverFailureClause 依据解析失败的原因给出结论与处置建议。
+func resolverFailureClause(err error) string {
 	text := describeFailure(err)
 	if hint := hintFailure(err); hint != "" {
 		text += "——" + hint
@@ -332,11 +334,11 @@ func Render(w io.Writer, r Report) error {
 			return err
 		}
 	}
-	endpoint := r.Env.DoHQueryURL
-	if r.Env.DoHQueryURLIsDefault {
+	endpoint := r.Env.ResolverEndpoint
+	if r.Env.ResolverEndpointIsDefault {
 		endpoint += "（默认，可用 PIXIV_DNS_QUERY_URL 更换）"
 	}
-	if _, err := fmt.Fprintf(w, "DoH 端点: %s\n", endpoint); err != nil {
+	if _, err := fmt.Fprintf(w, "解析端点: %s\n", endpoint); err != nil {
 		return err
 	}
 
@@ -356,12 +358,12 @@ func Render(w io.Writer, r Report) error {
 			return err
 		}
 	}
-	if r.DoH.Resolved != nil {
-		ips := make([]string, len(r.DoH.Resolved))
-		for i, ip := range r.DoH.Resolved {
+	if r.Resolver.Resolved != nil {
+		ips := make([]string, len(r.Resolver.Resolved))
+		for i, ip := range r.Resolver.Resolved {
 			ips[i] = ip.String()
 		}
-		if _, err := fmt.Fprintf(w, "DoH 对 i.pximg.net 的解析结果: %s\n",
+		if _, err := fmt.Fprintf(w, "解析结果（i.pximg.net）: %s\n",
 			strings.Join(ips, ", ")); err != nil {
 			return err
 		}

@@ -25,7 +25,7 @@ type liveProber struct {
 	// proxy 是探测代理路径时使用的代理地址；nil 表示未配置代理，
 	// 此时经代理的探测快速失败。
 	proxy *url.URL
-	// resolver 是 DoH 查询与直连拨号使用的解析器，与运行时同源
+	// resolver 是解析查询与直连拨号使用的解析器，与运行时同源
 	// （由环境变量播种）。
 	resolver dns.Resolver
 }
@@ -34,22 +34,33 @@ type liveProber struct {
 //
 // proxy 是代理路径探测使用的地址（来自环境配置，nil 表示未配置代理）；
 // resolver 由最外层装配注入：它是环境配置（PIXIV_DNS_QUERY_URL）的生效值，
-// 本包不自行读取环境。
+// 本包不自行读取环境。探测本身用端点字符串重建同一解析方式，见 ProbeResolver。
 func NewLiveProber(proxy *url.URL, resolver dns.Resolver) Prober {
 	return liveProber{proxy: proxy, resolver: resolver}
 }
 
-// ProbeDoH implements Prober.
+// ProbeResolver implements Prober.
 //
-// 运行时 DoH 查询经 http.DefaultClient 发出（遵循 HTTPS_PROXY），因此
-// 「直连 / 经代理」两个分支都用注入了受控 client 的解析器完整复现查询，
-// 得到与运行时两种环境对应的结果。viaProxy 为 true 且未配置代理时快速失败
-// ——静默按直连处理会产出误导性的「DoH 无需代理」结论。
-func (p liveProber) ProbeDoH(ctx context.Context, endpoint, host string, viaProxy bool) ([]net.IP, error) {
+// 解析方式完全由端点字符串决定，与运行时同一来源（dns.NewResolver）：
+// DoH、明文 DNS、系统解析三种写法探测的行为与运行时一致，不会漂移。
+// 端点写法非法时与运行时一样 panic。
+//
+// DoH 查询经 http.DefaultClient 发出（遵循 HTTPS_PROXY），因此「直连 / 经代理」
+// 两个分支都用注入了受控 client 的解析器完整复现查询。明文 DNS 与系统解析
+// 没有可经代理的 HTTP 请求，viaProxy 对它们是调用错误，快速失败而不是静默
+// 按直连处理——后者会产出误导性的「无需代理」结论。
+func (p liveProber) ProbeResolver(ctx context.Context, endpoint, host string, viaProxy bool) ([]net.IP, error) {
+	if !dns.EndpointUsesHTTP(endpoint) {
+		if viaProxy {
+			return nil, fmt.Errorf("pixiv: connectivity: 端点 %q 不经 HTTP 查询，没有可经代理的路径", endpoint)
+		}
+		return dns.NewResolver(endpoint).Resolve(ctx, host)
+	}
+
 	hc := &http.Client{}
 	if viaProxy {
 		if p.proxy == nil {
-			return nil, fmt.Errorf("pixiv: connectivity: 未配置代理，无法探测 DoH 的代理路径")
+			return nil, fmt.Errorf("pixiv: connectivity: 未配置代理，无法探测解析查询的代理路径")
 		}
 		// 受控分支：强制经代理，对应「运行时环境变量指向可用代理」的情形。
 		hc.Transport = &http.Transport{Proxy: func(*http.Request) (*url.URL, error) { return p.proxy, nil }}
@@ -59,7 +70,7 @@ func (p liveProber) ProbeDoH(ctx context.Context, endpoint, host string, viaProx
 	}
 	// 受控分支注入 client 以复现直连 / 经代理两种环境；
 	// 编码方式仍由端点 URL 的 fragment 决定，与运行时同一来源。
-	r := dns.NewDOHResolver(endpoint, dns.WithHTTPClient(hc))
+	r := dns.NewResolver(endpoint, dns.WithHTTPClient(hc))
 	return r.Resolve(ctx, host)
 }
 
