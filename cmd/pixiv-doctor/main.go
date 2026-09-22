@@ -24,7 +24,6 @@ import (
 
 	"github.com/NateScarlet/pixiv/internal/connectivity"
 	"github.com/NateScarlet/pixiv/pkg/client"
-	"github.com/NateScarlet/pixiv/pkg/client/dns"
 )
 
 // main 是最外层装配：读取环境、构建探测器与套件、渲染报告。
@@ -33,7 +32,7 @@ import (
 // ——诊断输出本身是成功的结果，退出码供调用方区分的是工具自身是否运行。
 func main() {
 	env := buildEnvironment()
-	resolver := dns.NewResolver(env.ResolverEndpoint)
+	resolver := connectivity.NewSharedResolver(env.ResolverEndpoint)
 	suite := connectivity.Suite{}
 	prober := connectivity.NewLiveProber(env.ProxyURL, resolver)
 

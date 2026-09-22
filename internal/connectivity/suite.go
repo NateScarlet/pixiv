@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/NateScarlet/pixiv/pkg/client"
 	"github.com/NateScarlet/pixiv/pkg/client/dns"
 )
 
@@ -27,6 +28,27 @@ const DefaultTimeout = 5 * time.Second
 type Hosts struct {
 	API   []string
 	Image []string
+}
+
+// resolutionHosts 是解析报告要逐台列出的主机清单。
+//
+// 除数据主机的接入目标（apiHosts / imageHosts）外，还要包含 no-SNI 的目标源站
+// （见 client.NoSNIHostTarget，如 www.pixiv.net 的源站 pixiv.net）——no-SNI 连接
+// 实际拨号解析的是这些别名，把它们列入报告才能对得上连接方式使用的地址。
+func resolutionHosts(hosts Hosts) []string {
+	var out = append([]string(nil), hosts.API...)
+	out = append(out, hosts.Image...)
+	seen := make(map[string]struct{}, len(out))
+	for _, h := range out {
+		seen[h] = struct{}{}
+	}
+	for _, target := range client.NoSNIHostTarget() {
+		if _, ok := seen[target]; ok {
+			continue
+		}
+		out = append(out, target)
+	}
+	return out
 }
 
 // Suite 执行默认的探测编排，产出报告。
@@ -85,11 +107,12 @@ func (s Suite) Run(ctx context.Context, env Environment, p Prober) Report {
 
 	// #region 任务收集：解析端点与各主机的直连、代理路径
 	// resolutions 由各主机的解析任务并发写入，全部任务结束后才汇总进报告。
-	allHosts := append(append([]string(nil), hosts.API...), hosts.Image...)
+	allHosts := resolutionHosts(hosts)
 	resolutions := make([]HostResolution, len(allHosts))
 	{
 		// 解析探测按主机清单逐台查询：API 与图片主机的解析结果可能不同，
-		// 只查其中一台无法回答「各主机解析到了什么」。
+		// 只查其中一台无法回答「各主机解析到了什么」。清单含 no-SNI 的目标源站
+		//（见 resolutionHosts），使报告的解析结果对得上各连接方式实际使用的地址。
 		for i, h := range allHosts {
 			record(probeTask{
 				name: "解析查询（直连）", detail: h,

@@ -48,7 +48,7 @@ func TestProbeResolverUsesEndpointDeclaredWireFormat(t *testing.T) {
 		srv, gotDNS, gotName := newEndpoint()
 		defer srv.Close()
 
-		p := liveProber{}
+		p := liveProber{resolver: NewSharedResolver(srv.URL)}
 		ips, err := p.ProbeResolver(context.Background(), srv.URL, "i.pximg.net", false)
 		require.NoError(t, err)
 		assert.NotEmpty(t, *gotDNS, "默认应按二进制报文方式发出查询")
@@ -61,7 +61,7 @@ func TestProbeResolverUsesEndpointDeclaredWireFormat(t *testing.T) {
 		srv, gotDNS, _ := newEndpoint()
 		defer srv.Close()
 
-		p := liveProber{}
+		p := liveProber{resolver: NewSharedResolver(srv.URL + "#type=message")}
 		_, err := p.ProbeResolver(context.Background(), srv.URL+"#type=message", "i.pximg.net", false)
 		require.NoError(t, err)
 		assert.NotEmpty(t, *gotDNS)
@@ -85,7 +85,8 @@ func TestProbeResolverDirectBranchIgnoresEnvProxy(t *testing.T) {
 	defer proxy.Close()
 	t.Setenv("HTTPS_PROXY", proxy.URL)
 
-	p := liveProber{}
+	// 直连解析走共享缓存解析器（它已用不受代理影响的客户端）；本用例关心代理路径。
+	p := liveProber{resolver: NewSharedResolver(endpoint.URL + "#type=json")}
 	// 该伪端点以 JSON 对答，因此按 JSON 方式查询；本用例关心的是代理路径。
 	ips, err := p.ProbeResolver(context.Background(), endpoint.URL+"#type=json", "i.pximg.net", false)
 	require.NoError(t, err)
@@ -136,7 +137,7 @@ func TestProbeResolverTraditionalDNS(t *testing.T) {
 	var want = net.ParseIP("203.0.113.7")
 	server := startUDPDNSServer(t, want)
 
-	p := liveProber{}
+	p := liveProber{resolver: NewSharedResolver("dns://" + server)}
 	ips, err := p.ProbeResolver(context.Background(), "dns://"+server, "i.pximg.net", false)
 	require.NoError(t, err)
 	require.Len(t, ips, 1)

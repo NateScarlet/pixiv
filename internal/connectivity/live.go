@@ -7,10 +7,28 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/NateScarlet/pixiv/pkg/client"
 	"github.com/NateScarlet/pixiv/pkg/client/dns"
 )
+
+// NewSharedResolver 构造被共享的缓存解析器：连接探测（ECH / 无 SNI）与解析报告
+// 的直连解析都经它解析，二者同源，报告的地址就是各连接方式实际使用的地址，也
+// 避免同一主机被反复、独立地解析。
+//
+// 解析查询复现「直连」路径：DoH 端点用不受环境代理影响的客户端，避免「直连解析」
+// 实际走了代理而与连接探测不一致。
+func NewSharedResolver(endpoint string) dns.Resolver {
+	var base dns.Resolver
+	if dns.EndpointUsesHTTP(endpoint) {
+		direct := &http.Client{Transport: &http.Transport{Proxy: nil}}
+		base = dns.NewResolver(endpoint, dns.WithHTTPClient(direct))
+	} else {
+		base = dns.NewResolver(endpoint)
+	}
+	return dns.NewCache(base, time.Hour)
+}
 
 // Prober 提供单项探测能力，是网络实现的接缝；测试注入 fake，
 // 真实实现见本文件。定义见 connectivity.go。
@@ -41,35 +59,24 @@ func NewLiveProber(proxy *url.URL, resolver dns.Resolver) Prober {
 
 // ProbeResolver implements Prober.
 //
-// 解析方式完全由端点字符串决定，与运行时同一来源（dns.NewResolver）：
-// DoH、明文 DNS、系统解析三种写法探测的行为与运行时一致，不会漂移。
-// 端点写法非法时与运行时一样 panic。
+// 直连解析走共享的缓存解析器（p.resolver，见 main.buildResolver）：它与连接探测
+// （ECH / 无 SNI）同源，报告列出的地址就是各连接方式实际使用的地址。
 //
-// DoH 查询经 http.DefaultClient 发出（遵循 HTTPS_PROXY），因此「直连 / 经代理」
-// 两个分支都用注入了受控 client 的解析器完整复现查询。明文 DNS 与系统解析
-// 没有可经代理的 HTTP 请求，viaProxy 对它们是调用错误，快速失败而不是静默
-// 按直连处理——后者会产出误导性的「无需代理」结论。
+// 经代理的解析只对经 HTTP 查询的端点有意义（明文 DNS 走 UDP、系统解析走平台
+// API），因此 viaProxy 时用注入代理的受控 client 重建同一解析方式；不经 HTTP 的
+// 端点对 viaProxy 是调用错误，快速失败而不是静默按直连处理。
 func (p liveProber) ProbeResolver(ctx context.Context, endpoint, host string, viaProxy bool) ([]net.IP, error) {
+	if !viaProxy {
+		return p.resolver.Resolve(ctx, host)
+	}
 	if !dns.EndpointUsesHTTP(endpoint) {
-		if viaProxy {
-			return nil, fmt.Errorf("pixiv: connectivity: 端点 %q 不经 HTTP 查询，没有可经代理的路径", endpoint)
-		}
-		return dns.NewResolver(endpoint).Resolve(ctx, host)
+		return nil, fmt.Errorf("pixiv: connectivity: 端点 %q 不经 HTTP 查询，没有可经代理的路径", endpoint)
 	}
-
-	hc := &http.Client{}
-	if viaProxy {
-		if p.proxy == nil {
-			return nil, fmt.Errorf("pixiv: connectivity: 未配置代理，无法探测解析查询的代理路径")
-		}
-		// 受控分支：强制经代理，对应「运行时环境变量指向可用代理」的情形。
-		hc.Transport = &http.Transport{Proxy: func(*http.Request) (*url.URL, error) { return p.proxy, nil }}
-	} else {
-		// 受控分支：禁用代理，使直连查询不受进程环境变量影响。
-		hc.Transport = &http.Transport{Proxy: nil}
+	if p.proxy == nil {
+		return nil, fmt.Errorf("pixiv: connectivity: 未配置代理，无法探测解析查询的代理路径")
 	}
-	// 受控分支注入 client 以复现直连 / 经代理两种环境；
-	// 编码方式仍由端点 URL 的 fragment 决定，与运行时同一来源。
+	// 受控分支：强制经代理，对应「运行时环境变量指向可用代理」的情形。
+	hc := &http.Client{Transport: &http.Transport{Proxy: func(*http.Request) (*url.URL, error) { return p.proxy, nil }}}
 	r := dns.NewResolver(endpoint, dns.WithHTTPClient(hc))
 	return r.Resolve(ctx, host)
 }
