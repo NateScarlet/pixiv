@@ -12,41 +12,6 @@ Pixiv 被墙所以需要配置代理。
 
 
 
-登录
-====================
-
-登录表单提交地址 ``https://accounts.pixiv.net/api/login?lang=zh``
-
-表单数据:
-
-pixiv_id
-
-    用户名
-
-password
-
-    密码
-
-post_key
-
-    登录页面 ``https://accounts.pixiv.net/login?lang=zh`` 上 ``input[name="post_key"]`` 元素的 ``value`` 属性。
-
-提交表单时请求必须带 ``post_key`` 对应的 ``PHPSESSID`` Cookie。
-
-成功时返回值:
-
-.. code-block:: json
-
-    {
-        "body": {
-            "success": {
-                "return_to": "https://www.pixiv.net/"
-            }
-        },
-        "error": false,
-        "message": ""
-    }
-
 判断是否登录
 ~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -57,10 +22,10 @@ post_key
 直接设置 Cookie
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-自动登录有时会触发 reCAPTCHA 验证， 所以支持直接设置 ``PHPSESSID``。
+R-18 内容需要登录。直接设置 ``PHPSESSID`` 即可，避免走已不支持的账号密码登录。
 
 用 ``client.WithPHPSESSID`` 选项提供，例如 ``client.New(client.WithPHPSESSID(os.Getenv("PIXIV_PHPSESSID")))``。
 
-未显式设置时，如果存在 ``PIXIV_PHPSESSID`` 变量将尝试直接使用此值作为登录凭据，登录无效时再尝试使用账号密码登录。
+未显式设置时，如果存在 ``PIXIV_PHPSESSID`` 变量将尝试直接使用此值作为登录凭据。
 
 

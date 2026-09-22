@@ -20,22 +20,6 @@ func TestLoginFromPHPSESSID(t *testing.T) {
 	assert.True(t, v)
 }
 
-func TestLogin(t *testing.T) {
-	t.Skip("may trigger reCAPTCHA")
-	username := os.Getenv("PIXIV_USER")
-	password := os.Getenv("PIXIV_PASSWORD")
-	if username == "" || password == "" {
-		t.Skip("need credentials")
-		return
-	}
-	c := New()
-	err := c.Login(username, password)
-	require.NoError(t, err)
-	v, err := c.IsLoggedIn()
-	require.NoError(t, err)
-	assert.True(t, v)
-}
-
 func TestIsLoggedIn(t *testing.T) {
 	testenv.RequireLive(t)
 	v, err := New().IsLoggedIn()
