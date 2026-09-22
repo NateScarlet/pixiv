@@ -80,32 +80,34 @@ func (s Suite) Run(ctx context.Context, env Environment, p Prober) Report {
 	}
 
 	// #region 任务收集：解析端点与各主机的直连、代理路径
+	// resolutions 由各主机的解析任务并发写入，全部任务结束后才汇总进报告。
+	allHosts := append(append([]string(nil), hosts.API...), hosts.Image...)
+	resolutions := make([]HostResolution, len(allHosts))
 	{
-		const probeHost = "i.pximg.net"
-		record(probeTask{
-			name: "解析查询（直连）", detail: env.ResolverEndpoint,
-			run: func(ctx context.Context) error {
-				ips, err := p.ProbeResolver(ctx, env.ResolverEndpoint, probeHost, false)
-				// 解析结果只由直连查询产出；失败时 err 携带原因。
-				mu.Lock()
-				rep.Resolver.Endpoint = env.ResolverEndpoint
-				if err == nil {
-					rep.Resolver.DirectOK = true
-					rep.Resolver.Resolved = ips
-				} else {
-					rep.Resolver.DirectErr = err
-				}
-				mu.Unlock()
-				return err
-			},
-		})
+		// 解析探测按主机清单逐台查询：API 与图片主机的解析结果可能不同，
+		// 只查其中一台无法回答「各主机解析到了什么」。
+		for i, h := range allHosts {
+			record(probeTask{
+				name: "解析查询（直连）", detail: h,
+				run: func(ctx context.Context) error {
+					ips, err := p.ProbeResolver(ctx, env.ResolverEndpoint, h, false)
+					mu.Lock()
+					// 解析结果只由直连查询产出；失败时 err 携带原因。
+					rep.Resolver.Endpoint = env.ResolverEndpoint
+					resolutions[i] = HostResolution{Host: h, IPs: ips, Err: err}
+					mu.Unlock()
+					return err
+				},
+			})
+		}
 		// 经代理的解析探测只对经 HTTP 查询的端点有意义：明文 DNS 走 UDP，
 		// 系统解析走平台 API，两者都不受进程代理环境变量影响。
-		if env.ProxyURL != nil && dns.EndpointUsesHTTP(env.ResolverEndpoint) {
+		// 查询哪台主机不影响「端点能否经代理查到」，取清单首台即可。
+		if env.ProxyURL != nil && dns.EndpointUsesHTTP(env.ResolverEndpoint) && len(allHosts) > 0 {
 			record(probeTask{
 				name: "解析查询（经代理）", detail: env.ResolverEndpoint,
 				run: func(ctx context.Context) error {
-					_, err := p.ProbeResolver(ctx, env.ResolverEndpoint, probeHost, true)
+					_, err := p.ProbeResolver(ctx, env.ResolverEndpoint, allHosts[0], true)
 					mu.Lock()
 					rep.Resolver.ProxyOK = err == nil
 					rep.Resolver.ProxyErr = err
@@ -226,6 +228,18 @@ func (s Suite) Run(ctx context.Context, env Environment, p Prober) Report {
 	}
 	wg.Wait()
 	rep.Checks = checks
+	// 逐台解析结果此时才完整：各解析任务已写入各自的槽位。
+	rep.Resolver.Resolutions = resolutions
+	// 端点是否可用按「任一主机解析成功」判定，与顺序无关：结论句说的
+	// 「解析直连可用」指的是这个端点能用，单台主机查不到（例如该名字
+	// 不存在）不代表端点坏了。
+	for _, res := range resolutions {
+		if res.Err == nil {
+			rep.Resolver.DirectOK = true
+		} else if rep.Resolver.DirectErr == nil {
+			rep.Resolver.DirectErr = res.Err
+		}
+	}
 	// #endregion
 
 	return rep

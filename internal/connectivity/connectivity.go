@@ -3,11 +3,12 @@
 // 它是诊断工具（cmd/pixiv-doctor）的引擎，不提供稳定性承诺；
 // 位于 internal，导出仅为测试与 cmd 装配的可见性。
 //
-// 报告回答三件事：
+// 报告回答四件事：
 //
 //  1. 环境多大程度上可以直连（ECH / 无 SNI / 常规）；
 //  2. AutoTransport 是否可链接（与运行时行为一致：任一方式可达即能用）；
-//  3. 配置了 HTTPS_PROXY 时，解析查询与数据传输（API / 图片）是否需要经过代理。
+//  3. 配置了 HTTPS_PROXY 时，解析查询与数据传输（API / 图片）是否需要经过代理；
+//  4. 各主机（API 与图片）分别解析到了什么地址。
 package connectivity
 
 import (
@@ -79,14 +80,30 @@ type HostReport struct {
 	ViaProxyErr error
 }
 
+// HostResolution 是一台主机经解析端点的查询结果。
+//
+// API 与图片主机各自解析到不同地址，逐台报告才能看出某类主机的解析
+// 是否异常；只查一台会把「图片主机解析正常」误读成解析整体正常。
+type HostResolution struct {
+	// Host 是被查询的主机名。
+	Host string
+	// IPs 是解析到的地址；Err 非 nil 时无意义。
+	IPs []net.IP
+	// Err 是本次查询失败的原因。
+	Err error
+}
+
 // ResolverReport 汇总解析端点的探测结果。
 type ResolverReport struct {
 	Endpoint string
-	// DirectOK 报告不经代理的查询是否成功。
-	DirectOK  bool
+	// DirectOK 报告不经代理的查询是否成功；任一主机解析成功即为 true，
+	// 单台主机的失败不表示端点不可用（见 Resolutions）。
+	DirectOK bool
+	// DirectErr 是首次失败的查询原因，用于端点整体失败的归因。
 	DirectErr error
-	// Resolved 是直连查询解析到的地址，用于对照「解析结果是否落在 pixiv 网段」。
-	Resolved []net.IP
+	// Resolutions 是逐台主机的直连查询结果，按主机清单顺序排列。
+	// 它是解析明细的来源；端点整体失败时各台主机同样失败。
+	Resolutions []HostResolution
 	// ProxyOK 报告经代理的查询是否成功；未配置代理、或解析方式不经 HTTP 时
 	// 恒为 false——那些情形下没有可经代理的出网路径。
 	ProxyOK  bool
@@ -358,17 +375,38 @@ func Render(w io.Writer, r Report) error {
 			return err
 		}
 	}
-	if r.Resolver.Resolved != nil {
-		ips := make([]string, len(r.Resolver.Resolved))
-		for i, ip := range r.Resolver.Resolved {
-			ips[i] = ip.String()
-		}
-		if _, err := fmt.Fprintf(w, "解析结果（i.pximg.net）: %s\n",
-			strings.Join(ips, ", ")); err != nil {
+
+	if _, err := fmt.Fprintf(w, "\n解析结果:\n"); err != nil {
+		return err
+	}
+	for _, res := range r.Resolver.Resolutions {
+		if err := renderResolution(w, res); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// renderResolution 渲染一台主机的解析结果。
+//
+// 解析失败的每台主机各自成行并带失败原因：某类主机被解析到错误地址
+// （例如被投毒或走了错误的解析端点）时，逐台对照才看得出来。
+func renderResolution(w io.Writer, res HostResolution) error {
+	state := ""
+	switch {
+	case res.Err != nil:
+		state = fmt.Sprintf("查询失败: %s", res.Err.Error())
+	case len(res.IPs) == 0:
+		state = "未解析到地址"
+	default:
+		ips := make([]string, len(res.IPs))
+		for i, ip := range res.IPs {
+			ips[i] = ip.String()
+		}
+		state = strings.Join(ips, ", ")
+	}
+	_, err := fmt.Fprintf(w, "  %s: %s\n", res.Host, state)
+	return err
 }
 
 // autoTransportState 用一句话描述默认传输的可用性。

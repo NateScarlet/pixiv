@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"testing"
 
 	"github.com/NateScarlet/pixiv/pkg/client/dns"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestClassifyFailure 断言各类失败被归到不同的性质。
@@ -125,4 +127,68 @@ func TestDohClausePrefersDirectError(t *testing.T) {
 func TestStatusErrorFormatting(t *testing.T) {
 	err := &dns.StatusError{StatusCode: 400, Status: "Bad Request"}
 	assert.Equal(t, "status 400 Bad Request", err.Error())
+}
+
+// TestRenderListsResolutionPerHost 断言渲染逐台列出解析结果：
+// 报告要能直接回答「API 主机解析到了什么」，而不只是图片主机。
+func TestRenderListsResolutionPerHost(t *testing.T) {
+	r := Report{
+		Env: testEnv(false),
+		Resolver: ResolverReport{
+			Endpoint: "https://1.1.1.1/dns-query",
+			DirectOK: true,
+			Resolutions: []HostResolution{
+				{Host: "www.pixiv.net", IPs: []net.IP{net.ParseIP("172.64.145.17")}},
+				{Host: "app-api.pixiv.net", IPs: []net.IP{net.ParseIP("172.64.145.18")}},
+				{Host: "i.pximg.net", IPs: []net.IP{net.ParseIP("210.140.139.132")}},
+			},
+		},
+	}
+
+	var buf strings.Builder
+	require.NoError(t, Render(&buf, r))
+	out := buf.String()
+
+	assert.Contains(t, out, "www.pixiv.net: 172.64.145.17")
+	assert.Contains(t, out, "app-api.pixiv.net: 172.64.145.18")
+	assert.Contains(t, out, "i.pximg.net: 210.140.139.132")
+}
+
+// TestRenderReportsResolutionFailure 断言解析失败的主机在解析结果中
+// 带出失败原因，而不是被静默略过——用户需要知道是「没解析到」还是「查不到」。
+func TestRenderReportsResolutionFailure(t *testing.T) {
+	r := Report{
+		Env: testEnv(false),
+		Resolver: ResolverReport{
+			Endpoint:  "https://1.1.1.1/dns-query",
+			DirectErr: errors.New("no such host"),
+			Resolutions: []HostResolution{
+				{Host: "app-api.pixiv.net", Err: errors.New("no such host")},
+			},
+		},
+	}
+
+	var buf strings.Builder
+	require.NoError(t, Render(&buf, r))
+	out := buf.String()
+
+	assert.Contains(t, out, "app-api.pixiv.net")
+	assert.Contains(t, out, "no such host")
+}
+
+// TestRenderReportsEmptyResolution 断言解析成功但没有地址时如实说明，
+// 而不是渲染成空行让人以为解析到了空结果。
+func TestRenderReportsEmptyResolution(t *testing.T) {
+	r := Report{
+		Env: testEnv(false),
+		Resolver: ResolverReport{
+			Endpoint:    "https://1.1.1.1/dns-query",
+			DirectOK:    true,
+			Resolutions: []HostResolution{{Host: "i.pximg.net"}},
+		},
+	}
+
+	var buf strings.Builder
+	require.NoError(t, Render(&buf, r))
+	assert.Contains(t, buf.String(), "i.pximg.net: 未解析到地址")
 }

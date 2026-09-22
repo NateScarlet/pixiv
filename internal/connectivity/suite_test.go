@@ -176,17 +176,19 @@ func TestSuiteProbesProxyWhenConfigured(t *testing.T) {
 	}
 	runSuite(t, testEnv(true), p)
 
-	assert.Contains(t, p.recordedCalls(), "resolve:true:https://1.1.1.1/dns-query:i.pximg.net")
+	assert.Contains(t, p.recordedCalls(), "resolve:true:https://1.1.1.1/dns-query:www.pixiv.net")
 	assert.Contains(t, p.recordedCalls(), "https:true:https://www.pixiv.net/")
 	assert.Contains(t, p.recordedCalls(), "https:true:https://i.pximg.net/")
 }
 
-// TestSuiteResolverQueriedForImageHost 断言解析探测查询的是图片主机：
-// 它同时是后续无 SNI 直连要解析的名字，查询它即可验证端点可用。
-func TestSuiteResolverQueriedForImageHost(t *testing.T) {
+// TestSuiteResolverQueriedForEveryHost 断言解析探测覆盖每一台待探测主机，
+// 而不是只查其中一台。
+//
+// API 与图片主机的解析结果可能不同（不同 CDN、不同封锁策略），
+// 只查一台就无法回答「API 主机解析到了什么」——那正是需要诊断的问题。
+func TestSuiteResolverQueriedForEveryHost(t *testing.T) {
 	p := &fakeProber{
-		resolve: func(_ context.Context, _ string, host string, _ bool) ([]net.IP, error) {
-			require.Equal(t, "i.pximg.net", host)
+		resolve: func(context.Context, string, string, bool) ([]net.IP, error) {
 			return []net.IP{net.ParseIP("210.140.139.129")}, nil
 		},
 		ech:   func(context.Context, string) error { return nil },
@@ -195,7 +197,112 @@ func TestSuiteResolverQueriedForImageHost(t *testing.T) {
 	}
 	runSuite(t, testEnv(false), p)
 
-	assert.Contains(t, p.recordedCalls(), "resolve:false:https://1.1.1.1/dns-query:i.pximg.net")
+	calls := p.recordedCalls()
+	for _, host := range []string{"www.pixiv.net", "app-api.pixiv.net", "i.pximg.net"} {
+		assert.Contains(t, calls, "resolve:false:https://1.1.1.1/dns-query:"+host,
+			"每台主机都应有直连解析探测")
+	}
+}
+
+// TestSuiteReportsResolutionPerHost 断言报告按主机保留各自的解析结果，
+// 供渲染时逐台对照。
+func TestSuiteReportsResolutionPerHost(t *testing.T) {
+	p := &fakeProber{
+		resolve: func(_ context.Context, _ string, host string, _ bool) ([]net.IP, error) {
+			// 让不同主机解析到不同地址，以证明结果没有被混在一起。
+			if host == "i.pximg.net" {
+				return []net.IP{net.ParseIP("210.140.139.132")}, nil
+			}
+			return []net.IP{net.ParseIP("172.64.145.17")}, nil
+		},
+		ech:   func(context.Context, string) error { return nil },
+		noSNI: func(context.Context, string) error { return nil },
+		https: func(context.Context, string, bool) error { return nil },
+	}
+	rep := runSuite(t, testEnv(false), p)
+
+	byHost := make(map[string]string, len(rep.Resolver.Resolutions))
+	for _, res := range rep.Resolver.Resolutions {
+		require.NoError(t, res.Err)
+		require.Len(t, res.IPs, 1)
+		byHost[res.Host] = res.IPs[0].String()
+	}
+	assert.Equal(t, map[string]string{
+		"www.pixiv.net":     "172.64.145.17",
+		"app-api.pixiv.net": "172.64.145.17",
+		"i.pximg.net":       "210.140.139.132",
+	}, byHost)
+}
+
+// TestSuiteEndpointUsableWhenOneHostFails 断言单台主机查不到不会把端点
+// 判为不可用。
+//
+// 「解析直连可用」说的是端点能用；某台主机查不到（例如该名字不存在）
+// 是主机的问题，报成「端点不可达」会把排查方向指向解析端点。
+func TestSuiteEndpointUsableWhenOneHostFails(t *testing.T) {
+	p := &fakeProber{
+		resolve: func(_ context.Context, _ string, host string, _ bool) ([]net.IP, error) {
+			if host == "app-api.pixiv.net" {
+				return nil, errors.New("no such host")
+			}
+			return []net.IP{net.ParseIP("210.140.139.129")}, nil
+		},
+		ech:   func(context.Context, string) error { return nil },
+		noSNI: func(context.Context, string) error { return nil },
+		https: func(context.Context, string, bool) error { return nil },
+	}
+	rep := runSuite(t, testEnv(false), p)
+
+	assert.True(t, rep.Resolver.DirectOK, "有主机解析成功即表示端点可用")
+	assert.Contains(t, rep.resolverClause(), "解析直连可用")
+}
+
+// TestSuiteEndpointUnusableWhenAllHostsFail 断言全部主机都查不到时端点
+// 报为不可用，并保留失败原因用于归因。
+func TestSuiteEndpointUnusableWhenAllHostsFail(t *testing.T) {
+	p := &fakeProber{
+		resolve: func(context.Context, string, string, bool) ([]net.IP, error) {
+			return nil, errors.New("connection refused")
+		},
+		ech:   func(context.Context, string) error { return nil },
+		noSNI: func(context.Context, string) error { return nil },
+		https: func(context.Context, string, bool) error { return nil },
+	}
+	rep := runSuite(t, testEnv(false), p)
+
+	assert.False(t, rep.Resolver.DirectOK)
+	require.Error(t, rep.Resolver.DirectErr)
+	assert.Contains(t, rep.resolverClause(), "不可达")
+}
+
+// TestSuiteReportsResolutionFailurePerHost 断言某台主机解析失败时，
+// 该主机的结果带出失败原因，且不影响其他主机的解析结果。
+func TestSuiteReportsResolutionFailurePerHost(t *testing.T) {
+	p := &fakeProber{
+		resolve: func(_ context.Context, _ string, host string, _ bool) ([]net.IP, error) {
+			if host == "app-api.pixiv.net" {
+				return nil, errors.New("no such host")
+			}
+			return []net.IP{net.ParseIP("210.140.139.132")}, nil
+		},
+		ech:   func(context.Context, string) error { return nil },
+		noSNI: func(context.Context, string) error { return nil },
+		https: func(context.Context, string, bool) error { return nil },
+	}
+	rep := runSuite(t, testEnv(false), p)
+
+	var failed *HostResolution
+	for i := range rep.Resolver.Resolutions {
+		if rep.Resolver.Resolutions[i].Host == "app-api.pixiv.net" {
+			failed = &rep.Resolver.Resolutions[i]
+		}
+	}
+	require.NotNil(t, failed, "解析结果应包含每台主机")
+	require.Error(t, failed.Err)
+	assert.Contains(t, failed.Err.Error(), "no such host")
+
+	// 一台失败不应让其他主机的解析结果丢失。
+	assert.Len(t, rep.Resolver.Resolutions, 3)
 }
 
 // TestVerdictFullyDirect 断言 ECH 与无 SNI 直连都成功、常规直连被封锁时，
@@ -374,8 +481,8 @@ func TestVerdictUnavailableWithProxy(t *testing.T) {
 // TestSuiteProbesConcurrently 断言各探测并行执行：全部探测都到达屏障后才放行，
 // 若串行执行则永远到不齐、只能在套件超时后失败。
 func TestSuiteProbesConcurrently(t *testing.T) {
-	// 无代理环境的任务数：1 次解析 + 2 台 API 主机 × 2 方式 + 1 台图片主机 × 2 方式。
-	const taskCount = 7
+	// 无代理环境的任务数：3 台主机各 1 次解析 + 2 台 API 主机 × 2 方式 + 1 台图片主机 × 2 方式。
+	const taskCount = 9
 
 	arrived := make(chan struct{}, taskCount)
 	allArrived := make(chan struct{})
