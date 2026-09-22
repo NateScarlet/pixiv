@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"sync"
 	"testing"
 	"time"
 
@@ -15,17 +16,35 @@ import (
 
 // fakeProber 用可替换的函数实现 Prober，记录每次调用，
 // 使编排与判定逻辑的测试不依赖真实网络。
+//
+// 套件并行调度探测，因此调用记录需要互斥：无保护的 append 会让并发
+// 调用互相覆盖，断言看到的调用清单随机缺项。
 type fakeProber struct {
 	doh   func(ctx context.Context, endpoint, host string, viaProxy bool) ([]net.IP, error)
 	https func(ctx context.Context, rawURL string, viaProxy bool) error
 	ech   func(ctx context.Context, host string) error
 	noSNI func(ctx context.Context, host string) error
 
+	mu    sync.Mutex
 	calls []string
 }
 
+// recordCall 记下一次调用。
+func (f *fakeProber) recordCall(format string, args ...any) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, fmt.Sprintf(format, args...))
+}
+
+// recordedCalls 返回已记录的调用清单副本。
+func (f *fakeProber) recordedCalls() []string {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]string(nil), f.calls...)
+}
+
 func (f *fakeProber) ProbeDoH(ctx context.Context, endpoint, host string, viaProxy bool) ([]net.IP, error) {
-	f.calls = append(f.calls, fmt.Sprintf("doh:%v:%s:%s", viaProxy, endpoint, host))
+	f.recordCall("doh:%v:%s:%s", viaProxy, endpoint, host)
 	if f.doh == nil {
 		return nil, errors.New("未预期的 ProbeDoH 调用")
 	}
@@ -33,7 +52,7 @@ func (f *fakeProber) ProbeDoH(ctx context.Context, endpoint, host string, viaPro
 }
 
 func (f *fakeProber) ProbeHTTPS(ctx context.Context, rawURL string, viaProxy bool) error {
-	f.calls = append(f.calls, fmt.Sprintf("https:%v:%s", viaProxy, rawURL))
+	f.recordCall("https:%v:%s", viaProxy, rawURL)
 	if f.https == nil {
 		return errors.New("未预期的 ProbeHTTPS 调用")
 	}
@@ -41,7 +60,7 @@ func (f *fakeProber) ProbeHTTPS(ctx context.Context, rawURL string, viaProxy boo
 }
 
 func (f *fakeProber) ProbeECH(ctx context.Context, host string) error {
-	f.calls = append(f.calls, "ech:"+host)
+	f.recordCall("ech:%s", host)
 	if f.ech == nil {
 		return errors.New("未预期的 ProbeECH 调用")
 	}
@@ -49,7 +68,7 @@ func (f *fakeProber) ProbeECH(ctx context.Context, host string) error {
 }
 
 func (f *fakeProber) ProbeNoSNI(ctx context.Context, host string) error {
-	f.calls = append(f.calls, "nosni:"+host)
+	f.recordCall("nosni:%s", host)
 	if f.noSNI == nil {
 		return errors.New("未预期的 ProbeNoSNI 调用")
 	}
@@ -89,11 +108,11 @@ func TestSuiteZeroValueUsesDefaultHosts(t *testing.T) {
 	}
 	rep := runSuite(t, testEnv(false), p)
 
-	assert.Contains(t, p.calls, "ech:www.pixiv.net")
-	assert.Contains(t, p.calls, "ech:app-api.pixiv.net")
-	assert.Contains(t, p.calls, "nosni:i.pximg.net")
-	assert.Contains(t, p.calls, "https:false:https://www.pixiv.net/")
-	assert.Contains(t, p.calls, "https:false:https://i.pximg.net/")
+	assert.Contains(t, p.recordedCalls(), "ech:www.pixiv.net")
+	assert.Contains(t, p.recordedCalls(), "ech:app-api.pixiv.net")
+	assert.Contains(t, p.recordedCalls(), "nosni:i.pximg.net")
+	assert.Contains(t, p.recordedCalls(), "https:false:https://www.pixiv.net/")
+	assert.Contains(t, p.recordedCalls(), "https:false:https://i.pximg.net/")
 	assert.NotEmpty(t, rep.Checks)
 }
 
@@ -115,7 +134,7 @@ func TestSuiteProbesProxyOnlyWhenConfigured(t *testing.T) {
 	}
 	runSuite(t, testEnv(false), p)
 
-	for _, c := range p.calls {
+	for _, c := range p.recordedCalls() {
 		assert.NotContains(t, c, ":true:", "未配置代理时不应有经代理的探测: %s", c)
 	}
 }
@@ -133,9 +152,9 @@ func TestSuiteProbesProxyWhenConfigured(t *testing.T) {
 	}
 	runSuite(t, testEnv(true), p)
 
-	assert.Contains(t, p.calls, "doh:true:https://1.1.1.1/dns-query:i.pximg.net")
-	assert.Contains(t, p.calls, "https:true:https://www.pixiv.net/")
-	assert.Contains(t, p.calls, "https:true:https://i.pximg.net/")
+	assert.Contains(t, p.recordedCalls(), "doh:true:https://1.1.1.1/dns-query:i.pximg.net")
+	assert.Contains(t, p.recordedCalls(), "https:true:https://www.pixiv.net/")
+	assert.Contains(t, p.recordedCalls(), "https:true:https://i.pximg.net/")
 }
 
 // TestSuiteDoHQueriedForImageHost 断言 DoH 探测查询的是图片主机：
@@ -152,7 +171,7 @@ func TestSuiteDoHQueriedForImageHost(t *testing.T) {
 	}
 	runSuite(t, testEnv(false), p)
 
-	assert.Contains(t, p.calls, "doh:false:https://1.1.1.1/dns-query:i.pximg.net")
+	assert.Contains(t, p.recordedCalls(), "doh:false:https://1.1.1.1/dns-query:i.pximg.net")
 }
 
 // TestVerdictFullyDirect 断言 ECH 与无 SNI 直连都成功、常规直连被封锁时，
