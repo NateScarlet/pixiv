@@ -247,14 +247,19 @@ DoH 端点的支持情况
 在其之上叠加「用加密的 ClientHello 连接」这一种能力。
 它与 ``NewNoSNITransport`` 同为原语，同样不含主机判断，也不含环境判断。
 
+底层传输传 ``nil`` 表示由库自建，这是常规用法：自建的传输只从进程环境变量取代理，
+而那不是调用者对 pixiv 的意图，故被忽略，ECH 主机直连（见下文「要点」）。
+调用者若传入自己的传输，其中的代理即视为显式指定，ECH 无法直连，请求会明确报错
+而不是静默降级。
+
 .. code-block:: go
 
     // 直连施加 ECH：这正是 ECH 的用途，绕开按 SNI 的封锁。
-    direct := client.New(client.WithTransport(client.NewECHTransport(&http.Transport{})))
+    direct := client.New(client.WithTransport(client.NewECHTransport(nil)))
 
     // 由调用者提供配置（例如已有可靠的配置分发渠道）。
     withConfig := client.New(client.WithTransport(client.NewECHTransport(
-        &http.Transport{},
+        nil,
         client.WithECHConfigList(myECHConfigList),
     )))
 
@@ -263,7 +268,7 @@ DoH 端点的支持情况
 .. code-block:: go
 
     c := client.New(
-        client.WithTransport(client.NewECHTransport(&http.Transport{})),
+        client.WithTransport(client.NewECHTransport(nil)),
         client.WithDNSResolver(dns.NewDOHResolver("https://1.1.1.1/dns-query")),
     )
 
