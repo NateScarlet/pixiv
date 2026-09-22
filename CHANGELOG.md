@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.9.0](https://github.com/NateScarlet/pixiv/compare/v0.8.3...v0.9.0) (2026-09-22)
+
+
+### ⚠ BREAKING CHANGES
+
+* **client:** should not ship the unsupported username/password login
+* **client:** resolve each connection way's target so ECH and no-SNI coexist
+
+### Features
+
+* **dns:** allow selecting traditional and system DNS via PIXIV_DNS_QUERY_URL ([85ec56d](https://github.com/NateScarlet/pixiv/commit/85ec56dc827209bab501cd03e7b7d60612213131)), closes [#97](https://github.com/NateScarlet/pixiv/issues/97)
+* **dns:** support the RFC 8484 message wire format ([7562243](https://github.com/NateScarlet/pixiv/commit/756224317a78546c3d9d7b9e5e95a87563b71509))
+
+
+### Bug Fixes
+
+* **client:** resolve each connection way's target so ECH and no-SNI coexist ([74ce5b1](https://github.com/NateScarlet/pixiv/commit/74ce5b1cc18bd542f9afa397c39e5acd7f21b85b))
+* **client:** should not ship the unsupported username/password login ([475aad6](https://github.com/NateScarlet/pixiv/commit/475aad6171bc1a37f18b77359a03109f28ba0c1f))
+* **connectivity:** label the no-SNI API probe as reaching the pixiv origin ([13c1a3c](https://github.com/NateScarlet/pixiv/commit/13c1a3cfd2f5ccdd45a67a62b432861a6a90990a))
+* **connectivity:** report the origin host and share one cached resolver ([98bfa4e](https://github.com/NateScarlet/pixiv/commit/98bfa4e5f859436cb9f40ee27a5c8e2589802bdb))
+* **connectivity:** should judge API reachability by www.pixiv.net alone ([eea6f3a](https://github.com/NateScarlet/pixiv/commit/eea6f3aae986d85f2125a64cf066d349e17b8a92))
+* **connectivity:** should report DNS results for every probed host ([424e875](https://github.com/NateScarlet/pixiv/commit/424e875f96d8d03d9070f0aa7633fa32632e155e))
+* **connectivity:** should report why the DoH endpoint failed ([bfd6984](https://github.com/NateScarlet/pixiv/commit/bfd69849401b42f7b9b5723962f47d60f95573bb))
+
 ## [0.8.3](https://github.com/NateScarlet/pixiv/compare/v0.8.2...v0.8.3) (2026-09-21)
 
 
