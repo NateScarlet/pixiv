@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.10.0](https://github.com/NateScarlet/pixiv/compare/v0.9.1...v0.10.0) (2026-09-24)
+
+
+### ⚠ BREAKING CHANGES
+
+* **client:** change default PIXIV_DNS_QUERY_URL to the system resolver
+* **client:** remove deprecated ParseAPIResponse
+
+### Features
+
+* **client:** change default PIXIV_DNS_QUERY_URL to the system resolver ([51bca35](https://github.com/NateScarlet/pixiv/commit/51bca351602687d4d48e1d66a8929e84510d1855))
+* **client:** remove deprecated ParseAPIResponse ([6626376](https://github.com/NateScarlet/pixiv/commit/66263762820d805d74d909f7e1f43aa8947a5537))
+
 ## [0.9.1](https://github.com/NateScarlet/pixiv/compare/v0.9.0...v0.9.1) (2026-09-24)
 
 
