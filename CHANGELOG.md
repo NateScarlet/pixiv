@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.9.1](https://github.com/NateScarlet/pixiv/compare/v0.9.0...v0.9.1) (2026-09-24)
+
+
+### Features
+
+* **artwork:** add ugoira meta fetch to download animated works ([58268ac](https://github.com/NateScarlet/pixiv/commit/58268acb356d61d62969d758ccae271ffcad081c))
+
+
+### Bug Fixes
+
+* **client:** should report api rejection status instead of invalid json ([0bd378c](https://github.com/NateScarlet/pixiv/commit/0bd378c654b6ad0d93515e6ff7db5179bb5ea08f))
+
 ## [0.9.0](https://github.com/NateScarlet/pixiv/compare/v0.8.3...v0.9.0) (2026-09-22)
 
 
