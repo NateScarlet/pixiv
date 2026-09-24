@@ -13,7 +13,7 @@ import (
 // 默认值。环境变量是默认值的播种来源，用于「设置环境变量即生效」的既有部署方式。
 const (
 	defaultServerURL   = "https://www.pixiv.net"
-	defaultDNSQueryURL = "https://1.1.1.1/dns-query"
+	defaultDNSQueryURL = "dns:"
 	defaultUserAgent   = "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20100101 Firefox/84.0"
 )
 
@@ -158,7 +158,12 @@ func New(opts ...Option) *Client {
 	return c
 }
 
-// DefaultDNSQueryURL 是未设置 PIXIV_DNS_QUERY_URL 时使用的默认 DoH 端点。
+// DefaultDNSQueryURL 是未设置 PIXIV_DNS_QUERY_URL 时使用的默认解析方式：系统解析。
+//
+// 公共 DoH 端点不再适合作为默认值——可用的端点随网络环境变化，
+// 写死其中一个会让不设置该变量的调用者在端点不可达时整体不可用。
+// 系统解析在任何环境下都存在，因此作为默认值；需要绕开被污染的
+// 系统解析时再显式设置本变量。
 const DefaultDNSQueryURL = defaultDNSQueryURL
 
 // defaultDNSResolver 返回环境变量播种的默认解析器，供本库自带的

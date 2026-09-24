@@ -31,7 +31,9 @@ PIXIV_DNS_QUERY_URL
 
   - ``dns:`` 或 ``dns://`` —— 系统解析，与 ``client.WithDNSResolver(nil)`` 同义。
 
-  默认值 ``https://1.1.1.1/dns-query`` 不变，因此不设置时行为与以往一致。
+  默认值为 ``dns:``（系统解析），因为公共 DoH 端点的可用性随网络环境变化，
+  写死其中一个会让未设置本变量的调用者在端点不可达时整体不可用。
+  需要绕开被污染的系统解析时显式设置为可用的 DoH 端点。
 
   DoH 默认按 `RFC 8484 <https://www.rfc-editor.org/rfc/rfc8484>`_ 的二进制报文接口查询
   （``GET`` + ``dns`` 参数携带 base64url 编码的 DNS 报文，``Accept: application/dns-message``）。

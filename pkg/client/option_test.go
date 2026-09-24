@@ -432,6 +432,23 @@ func TestDNSQueryURLInvalidSchemePanics(t *testing.T) {
 	assert.Panics(t, func() { defaultDNSResolver() })
 }
 
+// TestDefaultDNSQueryURLIsSystemResolver 断言未设置 PIXIV_DNS_QUERY_URL 时
+// 默认走系统解析，而不是某个写死的公共 DoH 端点。
+//
+// 公共 DoH 端点的可用性随网络环境变化，写死其中一个会让未设置该变量的
+// 调用者在端点不可达时整体不可用。
+func TestDefaultDNSQueryURLIsSystemResolver(t *testing.T) {
+	t.Setenv("PIXIV_DNS_QUERY_URL", "")
+	assert.Equal(t, "dns:", DefaultDNSQueryURL)
+	assert.False(t, dns.EndpointUsesHTTP(defaultDNSQueryURL),
+		"默认解析方式不应经 HTTP 发出查询（即不应是 DoH）")
+
+	// 默认解析器能解析出本机名，说明它确实在工作而不是构造期就失败。
+	ips, err := defaultDNSResolver().Resolve(context.Background(), "localhost")
+	require.NoError(t, err)
+	assert.NotEmpty(t, ips)
+}
+
 // resolverFunc 便于在测试中构造解析器。
 type resolverFunc func(ctx context.Context, host string) ([]net.IP, error)
 
