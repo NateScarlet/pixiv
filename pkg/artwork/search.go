@@ -53,9 +53,8 @@ func SearchV2(ctx context.Context, query string, options ...SearchV2Option) (_ S
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
 
-	raw, err := client.ParseAPIResponse(resp.Body)
+	raw, err := client.ParseAPIResponseV2(resp)
 	if err != nil {
 		return
 	}

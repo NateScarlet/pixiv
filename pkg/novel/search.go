@@ -95,11 +95,10 @@ func Search(ctx context.Context, query string, opts ...SearchOption) (result Sea
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
-	body, err := client.ParseAPIResult(resp.Body)
+	raw, err := client.ParseAPIResponseV2(resp)
 	if err != nil {
 		return
 	}
-	result = SearchResult{JSON: body}
+	result = SearchResult{JSON: gjson.ParseBytes(raw)}
 	return
 }

@@ -55,11 +55,11 @@ func (i *Artwork) Fetch(ctx context.Context) (err error) {
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
-	body, err := client.ParseAPIResult(resp.Body)
+	raw, err := client.ParseAPIResponseV2(resp)
 	if err != nil {
 		return
 	}
+	body := gjson.ParseBytes(raw)
 	i.Title = body.Get("illustTitle").String()
 	i.Type = body.Get("illustType").String()
 	i.Description = body.Get("description").String()
@@ -97,11 +97,11 @@ func (i *Artwork) FetchPages(ctx context.Context) (err error) {
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
-	data, err := client.ParseAPIResult(resp.Body)
+	raw, err := client.ParseAPIResponseV2(resp)
 	if err != nil {
 		return
 	}
+	data := gjson.ParseBytes(raw)
 	pages := make([]Page, 0, int(data.Get("#").Int()))
 	data.ForEach(func(key, value gjson.Result) bool {
 		i := Page{}

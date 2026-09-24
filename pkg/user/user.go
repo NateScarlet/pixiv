@@ -7,6 +7,7 @@ import (
 
 	"github.com/NateScarlet/pixiv/pkg/client"
 	"github.com/NateScarlet/pixiv/pkg/image"
+	"github.com/tidwall/gjson"
 )
 
 // User data.
@@ -26,11 +27,11 @@ func (i *User) Fetch(ctx context.Context) (err error) {
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
-	body, err := client.ParseAPIResult(resp.Body)
+	raw, err := client.ParseAPIResponseV2(resp)
 	if err != nil {
 		return
 	}
+	body := gjson.ParseBytes(raw)
 	i.Name = body.Get("name").String()
 	i.Avatar.Mini = body.Get("image").String()
 	i.Avatar.Thumb = body.Get("imageBig").String()

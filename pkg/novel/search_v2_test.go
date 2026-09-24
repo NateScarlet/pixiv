@@ -70,6 +70,28 @@ func TestSearchV2RequiresQuery(t *testing.T) {
 	require.Error(t, err)
 }
 
+// 搜索接口被边缘节点以 403 拒绝时，错误应说明状态码，
+// 而不是把整页 HTML 当作响应体去解析后报 invalid json。
+func TestSearchV2ShouldReportRejectedStatus(t *testing.T) {
+	const htmlForbiddenBody = "<html>\r\n<head><title>403 Forbidden</title></head>\r\n" +
+		"<body>\r\n<center><h1>403 Forbidden</h1></center>\r\n<hr><center>nginx</center>\r\n</body>\r\n</html>\r\n"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusForbidden)
+		io.WriteString(w, htmlForbiddenBody)
+	}))
+	t.Cleanup(server.Close)
+
+	c := client.New(client.WithServerURL(server.URL))
+	ctx := client.With(context.Background(), c)
+
+	_, err := SearchV2(ctx, "検索語")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "403")
+	assert.NotContains(t, err.Error(), "<html>")
+}
+
 // TestSearchV2Live 验证真实匿名接口的搜索响应解析(含字段名与 isAdContainer 广告条目)。
 func TestSearchV2Live(t *testing.T) {
 	testenv.RequireLive(t)

@@ -63,11 +63,11 @@ func (i *Novel) Fetch(ctx context.Context) (err error) {
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
-	data, err := client.ParseAPIResult(resp.Body)
+	raw, err := client.ParseAPIResponseV2(resp)
 	if err != nil {
 		return
 	}
+	data := gjson.ParseBytes(raw)
 	i.Title = data.Get("title").String()
 	i.Description = data.Get("description").String()
 	i.CoverURL = data.Get("coverUrl").String()

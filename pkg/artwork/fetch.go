@@ -23,8 +23,7 @@ func Fetch(ctx context.Context, id string) (_ FetchPayload, err error) {
 	if err != nil {
 		return
 	}
-	defer resp.Body.Close()
-	body, err := client.ParseAPIResponse(resp.Body)
+	body, err := client.ParseAPIResponseV2(resp)
 	if err != nil {
 		return
 	}
