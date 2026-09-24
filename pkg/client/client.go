@@ -97,31 +97,9 @@ func ParseAPIResponseV2(resp *http.Response) (_ json.RawMessage, err error) {
 }
 
 // Deprecated: use [ParseAPIResponseV2] instead.
-// ParseAPIResponse 解析 API 响应体，返回信封中 body 部分的原始 JSON。
-//
-// 它不接收响应本身，因此无法校验状态码：服务端以错误状态返回的 HTML 页面
-// 会被报成 invalid json。改用 [ParseAPIResponseV2] 可得到带状态码的错误。
-func ParseAPIResponse(r io.Reader) (_ json.RawMessage, err error) {
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return
-	}
-	if !gjson.ValidBytes(data) {
-		err = fmt.Errorf("pixiv: client: invalid json: %q", string(data))
-		return
-	}
-	var res = gjson.ParseBytes(data)
-	hasError := res.Get("error").Bool()
-	message := res.Get("message").String()
-	res = res.Get("body")
-	if hasError {
-		return data, fmt.Errorf("pixiv: client: api error: %s", message)
-	}
-	return json.RawMessage(res.Raw), err
-}
-
-// Deprecated: use [ParseAPIResponse] instead.
 // ParseAPIResult parses error from json api response, and returns body part.
+//
+// 它同样不接收响应本身，因此也无法校验状态码。
 func ParseAPIResult(r io.Reader) (ret gjson.Result, err error) {
 	data, err := ioutil.ReadAll(r)
 	if err != nil {
