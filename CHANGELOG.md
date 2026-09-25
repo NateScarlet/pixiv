@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.10.1](https://github.com/NateScarlet/pixiv/compare/v0.10.0...v0.10.1) (2026-09-25)
+
+
+### Features
+
+* add dedicated series page APIs ([792cb11](https://github.com/NateScarlet/pixiv/commit/792cb114bc60b0c36c135db3029575680a73e48b)), closes [#86](https://github.com/NateScarlet/pixiv/issues/86)
+
 ## [0.10.0](https://github.com/NateScarlet/pixiv/compare/v0.9.1...v0.10.0) (2026-09-24)
 
 
