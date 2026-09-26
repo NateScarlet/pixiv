@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.10.2](https://github.com/NateScarlet/pixiv/compare/v0.10.1...v0.10.2) (2026-09-26)
+
+
+### Bug Fixes
+
+* **client:** should report string error field as API error ([729b3b7](https://github.com/NateScarlet/pixiv/commit/729b3b7c71b0825c3066fb7d2c22c2149cfb8e73))
+
 ## [0.10.1](https://github.com/NateScarlet/pixiv/compare/v0.10.0...v0.10.1) (2026-09-25)
 
 
