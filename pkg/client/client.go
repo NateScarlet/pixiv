@@ -68,7 +68,8 @@ var ErrAPIRejected = errors.New("pixiv: client: api 请求被拒绝")
 // 失败路径下响应体已由本函数读完并关闭。
 //
 // 成功状态下仍需是可解析的 JSON 信封：信封里 error 为真时报出其中的 message，
-// 否则返回 body 字段的原始 JSON。204 这类无正文的成功响应按空值处理。
+// error 直接是错误信息字符串时按该字符串报错，否则返回 body 字段的原始 JSON。
+// 204 这类无正文的成功响应按空值处理。
 func ParseAPIResponseV2(resp *http.Response) (_ json.RawMessage, err error) {
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
@@ -87,13 +88,27 @@ func ParseAPIResponseV2(resp *http.Response) (_ json.RawMessage, err error) {
 		return nil, fmt.Errorf("pixiv: client: invalid json: %q", string(data))
 	}
 	var res = gjson.ParseBytes(data)
-	hasError := res.Get("error").Bool()
-	message := res.Get("message").String()
+	hasError, message := apiError(res)
 	res = res.Get("body")
 	if hasError {
 		return nil, fmt.Errorf("pixiv: client: api error: %s", message)
 	}
 	return json.RawMessage(res.Raw), nil
+}
+
+// apiError 判断信封是否表示失败，并给出错误消息。
+//
+// 服务端有两种失败形态：error 为真、消息在 message 字段；
+// 以及 error 直接是错误信息字符串（例如 {"error":"不在排行榜统计范围内"}），
+// 后者没有 message/body，必须按字符串内容判错，否则会被当成成功返回空 body。
+func apiError(res gjson.Result) (hasError bool, message string) {
+	errField := res.Get("error")
+	isStringError := errField.Type == gjson.String && errField.Str != ""
+	message = res.Get("message").String()
+	if isStringError && message == "" {
+		message = errField.Str
+	}
+	return errField.Bool() || isStringError, message
 }
 
 // Deprecated: use [ParseAPIResponseV2] instead.
@@ -111,8 +126,7 @@ func ParseAPIResult(r io.Reader) (ret gjson.Result, err error) {
 		return
 	}
 	ret = gjson.Parse(s)
-	hasError := ret.Get("error").Bool()
-	message := ret.Get("message").String()
+	hasError, message := apiError(ret)
 	ret = ret.Get("body")
 	if hasError {
 		err = fmt.Errorf("pixiv: client: api error: %s", message)

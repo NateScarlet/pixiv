@@ -82,6 +82,25 @@ func TestParseAPIResponseV2ShouldReportAPIError(t *testing.T) {
 	assert.Contains(t, err.Error(), "未登录")
 }
 
+// 有的端点把错误信息直接放在 error 字段（字符串），不带 message/body 信封。
+func TestParseAPIResponseV2ShouldReportStringError(t *testing.T) {
+	c := newResponseServer(t, http.StatusOK, "application/json", `{"error":"不在排行榜统计范围内"}`)
+	resp, err := doGet(t, c)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	raw, err := ParseAPIResponseV2(resp)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "不在排行榜统计范围内")
+	assert.Empty(t, raw)
+}
+
+func TestParseAPIResultShouldReportStringError(t *testing.T) {
+	_, err := ParseAPIResult(strings.NewReader(`{"error":"不在排行榜统计范围内"}`))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "不在排行榜统计范围内")
+}
+
 // 成功状态码不只有 200：带正文的 2xx 都应视为成功，
 // 而定义里没有正文的 204 与重定向、错误状态一样不该进入解析。
 func TestParseAPIResponseV2ShouldAcceptBodylessSuccessStatusAsEmpty(t *testing.T) {
