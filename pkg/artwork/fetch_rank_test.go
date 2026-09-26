@@ -8,6 +8,7 @@ import (
 	"github.com/NateScarlet/pixiv/internal/testenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/tidwall/gjson"
 )
 
 func TestFetchRank(t *testing.T) {
@@ -16,13 +17,19 @@ func TestFetchRank(t *testing.T) {
 	require.NoError(t, err)
 	var n int
 	for item := range payload.Items() {
+		n++
+		if gjson.GetBytes(item.Raw(), "mask_reason").String() != "" {
+			// 未登录时 pixiv 把不可见作品替换为占位条目，mask_reason 标注原因
+			// （例如 login_only）：条目只剩 ID 与占位图，标题与作者名必然为空，
+			// 故除存在性外的字段断言对它没有意义。
+			continue
+		}
 		assert.NotEmpty(t, item.ID())
 		assert.NotEmpty(t, item.Title())
 		assert.NotEmpty(t, item.AuthorID())
 		assert.NotEmpty(t, item.AuthorName())
 		assert.NotEmpty(t, item.Width())
 		assert.NotEmpty(t, item.Height())
-		n++
 	}
 	assert.GreaterOrEqual(t, n, 45)
 }
