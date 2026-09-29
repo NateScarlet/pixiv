@@ -62,6 +62,14 @@ func (p FetchPayload) get(path string) gjson.Result {
 	return gjson.GetBytes(p.raw, path)
 }
 
+// LocationMasked reports whether pixiv hides this artwork from the caller's region.
+// LocationMasked 报告 pixiv 是否按当前地区屏蔽了该作品。
+// 被屏蔽的作品详情记录仍可取得，但页数据端点返回 404，是否跳过页请求由调用方决定；
+// 字段缺失视为未屏蔽。
+func (p FetchPayload) LocationMasked() bool {
+	return p.get("locationMask").Bool()
+}
+
 // Title returns the artwork title.
 // Title 返回作品标题。
 func (p FetchPayload) Title() string {

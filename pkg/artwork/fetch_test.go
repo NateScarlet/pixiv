@@ -68,6 +68,24 @@ func TestFetchPayloadWithoutSeriesReturnsZeroSeries(t *testing.T) {
 	assert.Equal(t, int64(0), s.Order())
 }
 
+// issue #103: 区域屏蔽作品的详情端点仍返回 200 并标出 locationMask,
+// 而页端点返回 404,调用方据此决定要不要发页请求。
+func TestFetchPayloadLocationMasked(t *testing.T) {
+	tests := map[string]struct {
+		body string
+		want bool
+	}{
+		"被屏蔽的作品":   {body: `{"body":{"illustId":"148753396","locationMask":true}}`, want: true},
+		"没有该字段的作品": {body: `{"body":{"illustId":"100","illustTitle":"no mask"}}`, want: false},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := fetchPayloadFromMock(t, tt.body)
+			assert.Equal(t, tt.want, p.LocationMasked())
+		})
+	}
+}
+
 // TestFetchPayloadSeriesLive 验证真实匿名接口解析 seriesNavData(issue #84 样本: 147500314)。
 // 匿名接口无需登录;需要网络可用并配合代理访问 pixiv。
 func TestFetchPayloadSeriesLive(t *testing.T) {

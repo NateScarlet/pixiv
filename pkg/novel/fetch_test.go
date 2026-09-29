@@ -53,6 +53,23 @@ func TestFetchPayloadWithoutSeriesReturnsZeroSeries(t *testing.T) {
 	assert.True(t, p.Series().IsZero())
 }
 
+// issue #103: 与插画同构的区域屏蔽标记,详情记录可见而页数据不可取得。
+func TestFetchPayloadLocationMasked(t *testing.T) {
+	tests := map[string]struct {
+		body string
+		want bool
+	}{
+		"被屏蔽的作品":   {body: `{"body":{"title":"masked","locationMask":true}}`, want: true},
+		"没有该字段的作品": {body: `{"body":{"title":"no mask"}}`, want: false},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			p := novelFetchPayloadFromMock(t, tt.body)
+			assert.Equal(t, tt.want, p.LocationMasked())
+		})
+	}
+}
+
 // TestFetchSeriesLive 验证真实匿名接口解析 seriesNavData(issue #84 样本: novel 28612019)。
 // 匿名接口无需登录;需要网络可用并配合代理访问 pixiv。
 func TestFetchSeriesLive(t *testing.T) {
