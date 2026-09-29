@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -53,19 +52,44 @@ func (c *Client) GetWithContext(ctx context.Context, url string) (resp *http.Res
 	return c.Do(req)
 }
 
-// ErrAPIRejected 表示服务端以失败状态码拒绝了这次 API 请求（例如 403、429、503），
-// 因此响应体不是本库要解析的 JSON。调用者可用 [errors.Is] 分辨「被拒绝」与
-// 「响应格式不对」，前者通常值得退避重试或提示重新登录。
-var ErrAPIRejected = errors.New("pixiv: client: api 请求被拒绝")
+// ErrAPIRejected 表示服务端以失败状态码拒绝了这次 API 请求（例如 403、404、429、503），
+// 因此响应体不是本库要解析的 JSON。调用者可用它分辨「被拒绝」与「响应格式不对」，
+// 前者通常值得退避重试或提示重新登录。
+//
+// 这是携带本次请求数据的结构化错误，用 errors.As 取回，不是 errors.Is：
+//
+//	var rej *ErrAPIRejected
+//	if errors.As(err, &rej) {
+//		log.Println(rej.Response.StatusCode)
+//	}
+//
+// [ParseAPIResponseV2] 对非 2xx 状态返回本类型的指针，调用者再包一层错误也能取回。
+//
+// Response 是唯一的状态来源：状态码、状态行、请求 URI、响应头都在其中。
+// 其 Body 在报错前已关闭且未被读取，不能再读。
+type ErrAPIRejected struct {
+	// Response 是被拒绝的响应，Body 已关闭且未读取，仅供读取元数据。
+	Response *http.Response
+}
+
+// Error 实现 [error]。文本只含状态行，不带响应体——被边缘节点拒绝时响应体常是
+// 整页 HTML，对调用者没有价值。
+func (e *ErrAPIRejected) Error() string {
+	if e.Response == nil {
+		// 零值未携带响应，没有状态可报。
+		return "pixiv: client: api 请求被拒绝"
+	}
+	return "pixiv: client: api 请求被拒绝: " + e.Response.Status
+}
 
 // ParseAPIResponseV2 校验响应状态并解析 API 响应体，返回信封中 body 部分的原始 JSON。
 //
 // 它是 [ParseAPIResponse] 的替代：状态码只有从响应本身才读得到，
 // 因此由本函数一并校验，调用者不必（也无法）在别处补这一步。
 //
-// 成功状态（2xx）之外的响应以 [ErrAPIRejected] 报错，错误里带上状态行，
-// 但不带响应体——被边缘节点拒绝时响应体常是整页 HTML，对调用者没有价值。
-// 失败路径下响应体已由本函数读完并关闭。
+// 成功状态（2xx）之外的响应以 [ErrAPIRejected] 报错，错误里带上被拒响应
+// （状态码在其中，用 errors.As 取回），但不读取响应体——被边缘节点拒绝时响应体常是
+// 整页 HTML，对调用者没有价值。失败路径下响应体已由本函数关闭。
 //
 // 成功状态下仍需是可解析的 JSON 信封：信封里 error 为真时报出其中的 message，
 // error 直接是错误信息字符串时按该字符串报错，否则返回 body 字段的原始 JSON。
@@ -74,7 +98,7 @@ func ParseAPIResponseV2(resp *http.Response) (_ json.RawMessage, err error) {
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		// 状态行已足以说明失败原因，不读取响应体。
-		return nil, fmt.Errorf("%w: %s", ErrAPIRejected, resp.Status)
+		return nil, &ErrAPIRejected{Response: resp}
 	}
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {

@@ -1,6 +1,7 @@
 package client
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -47,6 +48,52 @@ func TestParseAPIResponseV2ShouldRejectNonOKStatus(t *testing.T) {
 	assert.Contains(t, err.Error(), "403")
 	// 状态码是失败原因，不该把整页 HTML 混进错误。
 	assert.NotContains(t, err.Error(), "<html>")
+}
+
+// 区域屏蔽作品的页端点返回 404 且信封 message 为空(issue #103),
+// 错误里必须能取回状态码与被拒响应,否则调用者无从分辨失败原因。
+func TestParseAPIResponseV2ShouldReturnTypedRejection(t *testing.T) {
+	c := newResponseServer(t, http.StatusNotFound, "application/json", `{"error":true,"message":"","body":[]}`)
+	resp, err := doGet(t, c)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	_, err = ParseAPIResponseV2(resp)
+	require.Error(t, err)
+
+	var rej *ErrAPIRejected
+	require.ErrorAs(t, err, &rej)
+	require.NotNil(t, rej.Response)
+	assert.Equal(t, http.StatusNotFound, rej.Response.StatusCode)
+	assert.Equal(t, "404 Not Found", rej.Response.Status)
+	require.NotNil(t, rej.Response.Request)
+	assert.Equal(t, "/ajax/search/artworks/test", rej.Response.Request.URL.Path)
+	// 错误文本仍是状态行,不混入响应体。
+	assert.Contains(t, err.Error(), "pixiv: client: api 请求被拒绝: 404 Not Found")
+	assert.NotContains(t, err.Error(), "{")
+}
+
+// 调用者会用自己的上下文包一层错误,errors.As 必须仍能穿透。
+func TestParseAPIResponseV2RejectionShouldSurviveWrapping(t *testing.T) {
+	c := newResponseServer(t, http.StatusForbidden, "text/html; charset=utf-8", htmlForbiddenBody)
+	resp, err := doGet(t, c)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	_, err = ParseAPIResponseV2(resp)
+	require.Error(t, err)
+
+	var rej *ErrAPIRejected
+	require.ErrorAs(t, fmt.Errorf("artwork.FetchPages: %w", err), &rej)
+	require.NotNil(t, rej.Response)
+	assert.Equal(t, http.StatusForbidden, rej.Response.StatusCode)
+	assert.NotContains(t, rej.Error(), "<html>")
+}
+
+// 零值不携带响应,Error 仍给出可读文本而不是 panic。
+func TestErrAPIRejectedZeroValueShouldNotPanic(t *testing.T) {
+	var e ErrAPIRejected
+	assert.Equal(t, "pixiv: client: api 请求被拒绝", e.Error())
 }
 
 func TestParseAPIResponseV2ShouldRejectUnparsableBody(t *testing.T) {
