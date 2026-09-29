@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.11.0](https://github.com/NateScarlet/pixiv/compare/v0.10.1...v0.11.0) (2026-09-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* **client:** expose status code and response for rejected API requests
+
+### Features
+
+* add LocationMasked accessor to artwork and novel detail payloads ([c1f0407](https://github.com/NateScarlet/pixiv/commit/c1f0407da4d37ed96a4047567b745f7fa8bae71f)), closes [#103](https://github.com/NateScarlet/pixiv/issues/103)
+* **client:** expose status code and response for rejected API requests ([1872e55](https://github.com/NateScarlet/pixiv/commit/1872e55982f4832c0bef8c06aff23b0acc47844d))
+
+
+### Bug Fixes
+
+* **client:** should report string error field as API error ([729b3b7](https://github.com/NateScarlet/pixiv/commit/729b3b7c71b0825c3066fb7d2c22c2149cfb8e73))
+
 ## [0.10.1](https://github.com/NateScarlet/pixiv/compare/v0.10.0...v0.10.1) (2026-09-25)
 
 
