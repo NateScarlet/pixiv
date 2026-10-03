@@ -90,6 +90,36 @@ func TestParseAPIResponseV2RejectionShouldSurviveWrapping(t *testing.T) {
 	assert.NotContains(t, rej.Error(), "<html>")
 }
 
+// 直接用 CheckAPIResponse 的端点要自己读响应体(ranking.php 没有 {error, body} 信封),
+// 所以它只判状态，既不读也不关 body，成功时 body 仍可读。
+func TestCheckAPIResponseShouldLeaveBodyReadable(t *testing.T) {
+	c := newResponseServer(t, http.StatusOK, "application/json", `{"contents":[]}`)
+	resp, err := doGet(t, c)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.NoError(t, CheckAPIResponse(resp))
+	data, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"contents":[]}`, string(data))
+}
+
+// 状态校验与信封解析是两步：非 2xx 先在这里被拒，调用方用 errors.As 取回状态码做退避。
+func TestCheckAPIResponseShouldRejectNon2xx(t *testing.T) {
+	c := newResponseServer(t, http.StatusForbidden, "text/html; charset=utf-8", htmlForbiddenBody)
+	resp, err := doGet(t, c)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	err = CheckAPIResponse(resp)
+	require.Error(t, err)
+	var rej *ErrAPIRejected
+	require.ErrorAs(t, err, &rej)
+	require.NotNil(t, rej.Response)
+	assert.Equal(t, http.StatusForbidden, rej.Response.StatusCode)
+	assert.NotContains(t, err.Error(), "<html>")
+}
+
 // 零值不携带响应,Error 仍给出可读文本而不是 panic。
 func TestErrAPIRejectedZeroValueShouldNotPanic(t *testing.T) {
 	var e ErrAPIRejected

@@ -65,10 +65,13 @@ func (c *Client) GetWithContext(ctx context.Context, url string) (resp *http.Res
 //
 // [ParseAPIResponseV2] 对非 2xx 状态返回本类型的指针，调用者再包一层错误也能取回。
 //
+// [CheckAPIResponse] 同样返回本类型。
+//
 // Response 是唯一的状态来源：状态码、状态行、请求 URI、响应头都在其中。
-// 其 Body 在报错前已关闭且未被读取，不能再读。
+// 其 Body 从不被本库的拒绝路径读取；[ParseAPIResponseV2] 报错时已关闭它，
+// 直接使用 [CheckAPIResponse] 的调用方要自己负责关闭。
 type ErrAPIRejected struct {
-	// Response 是被拒绝的响应，Body 已关闭且未读取，仅供读取元数据。
+	// Response 是被拒绝的响应，仅供读取元数据。
 	Response *http.Response
 }
 
@@ -80,6 +83,22 @@ func (e *ErrAPIRejected) Error() string {
 		return "pixiv: client: api 请求被拒绝"
 	}
 	return "pixiv: client: api 请求被拒绝: " + e.Response.Status
+}
+
+// CheckAPIResponse 校验响应状态，成功返回 nil，非 2xx 返回 [ErrAPIRejected]。
+//
+// 状态码只有从响应本身才读得到，因此校验必须发生在解析之前：[ParseAPIResponseV2]
+// 为有 {error, body} 信封的端点两步一起做完，而没有信封的旧式端点
+// （ranking.php 的 contents 在顶层）用本函数校验后自己读响应体。
+// 不校验的后果是把边缘节点的整页 HTML 当成数据返回给调用方，err == nil，
+// 调用方无从按状态码退避重试，也分不清「被拒绝」与「响应格式不对」。
+//
+// 本函数只判状态：不读也不关响应体，关闭由调用方负责（[ParseAPIResponseV2] 已代为关闭）。
+func CheckAPIResponse(resp *http.Response) error {
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		return &ErrAPIRejected{Response: resp}
+	}
+	return nil
 }
 
 // ParseAPIResponseV2 校验响应状态并解析 API 响应体，返回信封中 body 部分的原始 JSON。
@@ -94,11 +113,14 @@ func (e *ErrAPIRejected) Error() string {
 // 成功状态下仍需是可解析的 JSON 信封：信封里 error 为真时报出其中的 message，
 // error 直接是错误信息字符串时按该字符串报错，否则返回 body 字段的原始 JSON。
 // 204 这类无正文的成功响应按空值处理。
+//
+// 响应体不是 {error, body} 信封的旧式端点（ranking.php）不能走本函数，
+// 那种响应要自己配 [CheckAPIResponse] 加自己的解析。
 func ParseAPIResponseV2(resp *http.Response) (_ json.RawMessage, err error) {
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+	if err := CheckAPIResponse(resp); err != nil {
 		// 状态行已足以说明失败原因，不读取响应体。
-		return nil, &ErrAPIRejected{Response: resp}
+		return nil, err
 	}
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {

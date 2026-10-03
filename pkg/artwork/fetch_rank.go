@@ -90,6 +90,11 @@ func FetchRank(ctx context.Context, mode RankMode, options ...FetchRankOption) (
 		return
 	}
 	defer resp.Body.Close()
+	// ranking.php 没有 {error, body} 信封，contents 在顶层，
+	// 因此状态校验与解析分开做，解析不能用 [client.ParseAPIResponseV2]。
+	if err := client.CheckAPIResponse(resp); err != nil {
+		return FetchRankPayload{}, err
+	}
 	raw, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return

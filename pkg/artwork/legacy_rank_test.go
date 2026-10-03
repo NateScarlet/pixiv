@@ -2,10 +2,14 @@ package artwork
 
 import (
 	"context"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 	"time"
 
 	"github.com/NateScarlet/pixiv/internal/testenv"
+	"github.com/NateScarlet/pixiv/pkg/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -29,6 +33,27 @@ func TestRankURL(t *testing.T) {
 			assert.Equal(t, tt.want, u.String())
 		})
 	}
+}
+
+// issue #104: ranking.php 不校验状态码时，边缘节点的 403 错误页会被解析成
+// 「零条目榜单」并报成 no rank items found，调用方拿不到状态码，无法退避重试。
+func TestRankFetchShouldRejectNon2xx(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusForbidden)
+		io.WriteString(w, "<html><head><title>403 Forbidden</title></head><body><center><h1>403 Forbidden</h1></center><hr><center>nginx</center></body></html>")
+	}))
+	t.Cleanup(server.Close)
+	ctx := client.With(context.Background(), client.New(client.WithServerURL(server.URL)))
+
+	rank := &Rank{Mode: "daily"}
+	err := rank.Fetch(ctx)
+	require.Error(t, err)
+	var rej *client.ErrAPIRejected
+	require.ErrorAs(t, err, &rej)
+	require.NotNil(t, rej.Response)
+	assert.Equal(t, http.StatusForbidden, rej.Response.StatusCode)
+	assert.Empty(t, rank.Items)
 }
 
 func TestArtworkRankSimple(t *testing.T) {

@@ -85,6 +85,11 @@ func (rank *Rank) Fetch(ctx context.Context) (err error) {
 		return
 	}
 	defer resp.Body.Close()
+	// ranking.php 没有 {error, body} 信封，状态校验要自己配 [client.CheckAPIResponse]，
+	// 否则被边缘节点拒绝时的整页 HTML 会被当成「零条目榜单」。
+	if err := client.CheckAPIResponse(resp); err != nil {
+		return err
+	}
 	data, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return

@@ -3,9 +3,13 @@ package artwork
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"github.com/NateScarlet/pixiv/internal/testenv"
+	"github.com/NateScarlet/pixiv/pkg/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
@@ -32,6 +36,50 @@ func TestFetchRank(t *testing.T) {
 		assert.NotEmpty(t, item.Height())
 	}
 	assert.GreaterOrEqual(t, n, 45)
+}
+
+// fetchRankWithMock 用给定 status 与 body 起一个假服务端，返回指向它的 context。
+func fetchRankWithMock(t *testing.T, status int, contentType, body string) context.Context {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", contentType)
+		w.WriteHeader(status)
+		io.WriteString(w, body)
+	}))
+	t.Cleanup(server.Close)
+	return client.With(context.Background(), client.New(client.WithServerURL(server.URL)))
+}
+
+// issue #104: 边缘节点拒绝请求时返回的整页 HTML 不能被当作榜单数据返回给调用方
+// (err == nil)，否则 403 / 429 与「响应格式不对」无法区分，也无从退避重试。
+func TestFetchRankShouldRejectNon2xx(t *testing.T) {
+	ctx := fetchRankWithMock(t, http.StatusForbidden, "text/html; charset=utf-8",
+		"<html><head><title>403 Forbidden</title></head><body><center><h1>403 Forbidden</h1></center><hr><center>nginx</center></body></html>")
+
+	_, err := FetchRank(ctx, DailyRank)
+	require.Error(t, err)
+	// 调用方按状态码退避重试或提示重新登录的入口。
+	var rej *client.ErrAPIRejected
+	require.ErrorAs(t, err, &rej)
+	require.NotNil(t, rej.Response)
+	assert.Equal(t, http.StatusForbidden, rej.Response.StatusCode)
+}
+
+// ranking.php 是旧式端点，响应没有 {error, body} 信封，contents 在顶层。
+// 状态校验不能顺手把它套进信封解析里，否则成功路径会一起被弄坏。
+func TestFetchRankShouldReturnTopLevelContents(t *testing.T) {
+	ctx := fetchRankWithMock(t, http.StatusOK, "application/json",
+		`{"contents":[{"illust_id":"148882180","title":"t","rank":1}],"mode":"daily"}`)
+
+	payload, err := FetchRank(ctx, DailyRank)
+	require.NoError(t, err)
+	var n int
+	for item := range payload.Items() {
+		n++
+		assert.Equal(t, "148882180", item.ID())
+	}
+	assert.Equal(t, 1, n)
+	assert.Equal(t, http.StatusOK, payload.Response().StatusCode)
 }
 
 func TestItemInFetchRankPayloadMaxWidth1200URL(t *testing.T) {
