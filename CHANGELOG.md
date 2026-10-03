@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.11.1](https://github.com/NateScarlet/pixiv/compare/v0.11.0...v0.11.1) (2026-10-03)
+
+
+### Bug Fixes
+
+* **artwork:** should reject non-2xx responses in FetchRank ([508021d](https://github.com/NateScarlet/pixiv/commit/508021dc5487364c4afcf06ab233cb95b6700435)), closes [#104](https://github.com/NateScarlet/pixiv/issues/104)
+
 ## [0.11.0](https://github.com/NateScarlet/pixiv/compare/v0.10.1...v0.11.0) (2026-09-29)
 
 
