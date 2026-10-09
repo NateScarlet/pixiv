@@ -72,7 +72,8 @@ func (c *Client) FetchImage(ctx context.Context, imageURL string) (*http.Respons
 	if resp.StatusCode != http.StatusOK {
 		// 只有 200 是成功：206 之类的部分内容会给出被截断的字节，
 		// 与「字节与源站返回一致」相冲突，调用者不应把它当作取回成功。
-		// 非 200 的响应体对调用者无用，关闭它以复用连接；失败时只返回错误。
+		// 非 200 的响应体对调用者无用，关闭它以免连接与正文泄漏；
+		// 失败时只返回错误。
 		// 关闭失败不改变结论（已决定报错），但它是调用者可见的诊断信息。
 		var closeErr = resp.Body.Close()
 		return nil, errors.Join(fmt.Errorf("%w: 请求 %s 返回 %s",

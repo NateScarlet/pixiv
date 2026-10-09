@@ -112,7 +112,8 @@ func (t *routedTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 	if r.noSNI {
 		if err := verifyResponseHostname(resp, host); err != nil {
-			// 响应不可用，关闭它以复用连接；关闭失败也是调用者可见的诊断信息。
+			// 响应不可用，关闭它以免连接与正文泄漏给一个没人会消费的应答；
+			// 关闭失败也是调用者可见的诊断信息。
 			return nil, errors.Join(err, resp.Body.Close())
 		}
 	}

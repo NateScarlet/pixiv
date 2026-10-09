@@ -76,6 +76,8 @@ func (t *AutoTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 			// 需按请求主机在收到响应后补齐（与路由层的做法一致）。
 			err = verifyResponseHostname(resp, host)
 			if err != nil {
+				// 响应不可用，关闭它以免连接与正文泄漏给一个没人会消费的应答；
+				// 关闭失败也是调用者可见的诊断信息。
 				err = errors.Join(err, resp.Body.Close())
 			}
 		}
