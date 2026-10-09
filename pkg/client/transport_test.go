@@ -155,21 +155,69 @@ func TestRoutedTransportHostListsCoverBothWays(t *testing.T) {
 	}
 }
 
-// TestAutoTransportWiresChannelStates 断言 setup 装配出 API 的 ECH 与不发送 SNI
-// 两个自定义通道，且是两份不同的传输。
+// TestNewNoSNITransportReturnsOpaqueRoundTripper 断言原语的返回值是不透明类型：
+// 调用者只依赖 http.RoundTripper，库不暴露底层 *http.Transport。
+func TestNewNoSNITransportReturnsOpaqueRoundTripper(t *testing.T) {
+	var rt http.RoundTripper = NewNoSNITransport(defaultBaseTransport())
+	require.NotNil(t, rt)
+	_, isPlain := rt.(*http.Transport)
+	assert.False(t, isPlain, "不应把底层传输暴露给调用者")
+}
+
+// TestNoSNITransportReleasesIdleConnections 断言调用者经 http.Client
+// 释放空闲连接对本原语仍然有效：它不再暴露底层传输，调用者唯一的释放途径
+// 就是标准库的 http.Client.CloseIdleConnections。
+func TestNoSNITransportReleasesIdleConnections(t *testing.T) {
+	var serverName atomic.Value
+	var server = newTLSServer(t, statusHandler(http.StatusOK), &serverName)
+	var base = dialTo(server)
+	var dials int32
+	var dial = base.DialContext
+	base.DialContext = func(ctx context.Context, network, addr string) (net.Conn, error) {
+		atomic.AddInt32(&dials, 1)
+		return dial(ctx, network, addr)
+	}
+
+	client := &http.Client{Transport: NewNoSNITransport(base)}
+	var get = func() {
+		t.Helper()
+		resp, err := client.Get(server.URL)
+		require.NoError(t, err)
+		io.Copy(io.Discard, resp.Body)
+		resp.Body.Close()
+	}
+	get()
+	get()
+	require.Equal(t, int32(1), atomic.LoadInt32(&dials), "第二次请求应复用连接")
+
+	client.CloseIdleConnections()
+	get()
+	assert.Equal(t, int32(2), atomic.LoadInt32(&dials), "释放空闲连接后应重新拨号")
+}
+
+// TestAutoTransportWiresWorkingChannels 断言 setup 装配出的两个自定义通道确实可用：
+// 不发送 SNI 的通道经它发出的请求完成握手且服务端观测不到 SNI。
 //
 // 通道装配只取决于 base 是否为 *http.Transport；对代理的对待（隐式/显式）由
 // ECH 传输自身处理，见 transport_ech.go。
-func TestAutoTransportWiresChannelStates(t *testing.T) {
-	rt := &AutoTransport{}
+func TestAutoTransportWiresWorkingChannels(t *testing.T) {
+	var serverName atomic.Value
+	var server = newTLSServer(t, statusHandler(http.StatusOK), &serverName)
+
+	rt := &AutoTransport{
+		Base:      dialTo(server),
+		hostNames: &hostSets{image: map[string]struct{}{"example.com": {}}},
+	}
 	rt.setup()
-	_, isECH := rt.ech.(*echTransport)
-	require.True(t, isECH, "API 通道应装配 ECH（实际 %T）", rt.ech)
-	noSNI, ok := rt.nosni.(*http.Transport)
-	require.True(t, ok, "应装配不发送 SNI 的通道（实际 %T）", rt.nosni)
-	require.NotNil(t, noSNI.TLSClientConfig)
-	assert.Equal(t, noSNIServerName, noSNI.TLSClientConfig.ServerName, "该通道应不发送 SNI")
+	require.NotNil(t, rt.ech)
+	require.NotNil(t, rt.nosni)
 	assert.NotSame(t, rt.ech, rt.nosni, "两个通道不应共用同一份传输")
+
+	resp, err := (&http.Client{Transport: rt}).Get("https://example.com/x.png")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "", serverName.Load(), "装配出的通道应不发送 SNI")
 }
 
 // TestAutoTransportFallsBackAndVerifiesNoSNIHostname 断言 API 主机的首选方式失败后
@@ -254,6 +302,42 @@ func TestAutoTransportPrefersLastWorkingWay(t *testing.T) {
 	assert.Zero(t, atomic.LoadInt32(&echCalls), "已确认 ECH 不可用，后续请求不应再尝试")
 }
 
+// TestAutoTransportSkipsRejectedNoSNILeg 断言服务端拒绝不发送 SNI 的腿之后，
+// 自动选择既不会把那条腿的拒绝当成可用、也不会把它留在后续请求的首选：
+// 这正是「ECH 抖动一次、此后全部 403」的成因。
+func TestAutoTransportSkipsRejectedNoSNILeg(t *testing.T) {
+	const host = "api.example.com"
+	var serverName atomic.Value
+	var rejected int32
+	var rejecting = newTLSServer(t, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt32(&rejected, 1)
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte("<html>403 Forbidden</html>"))
+	}), &serverName)
+
+	rt := &AutoTransport{hostNames: &hostSets{api: map[string]struct{}{host: {}}}}
+	rt.once.Do(func() {
+		rt.ech = roundTripperFunc(func(*http.Request) (*http.Response, error) {
+			return nil, errors.New("stub: ECH 不可用")
+		})
+		// 真实的 noSNI 腿：拨到以 403 一律拒绝的本地服务端。
+		rt.nosni = NewNoSNITransport(dialTo(rejecting))
+		rt.base = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+			return okResponse(req), nil
+		})
+	})
+
+	client := &http.Client{Transport: rt}
+	for i := range 2 {
+		resp, err := client.Get("https://" + host + "/ajax/search/novels/x")
+		require.NoError(t, err, "第 %d 次请求：被拒绝的腿应让路给其余方式", i+1)
+		resp.Body.Close()
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	}
+	assert.Equal(t, int32(1), atomic.LoadInt32(&rejected),
+		"被拒绝的腿只应在首次请求中被尝试一次，后续请求不应再复用它")
+}
+
 // TestAutoTransportUsesSingleECHChannel 断言所有 API 主机复用同一份 ECH 通道，
 // 图片主机走不发送 SNI 的通道。
 //
@@ -266,16 +350,25 @@ func TestAutoTransportUsesSingleECHChannel(t *testing.T) {
 	require.True(t, isECH, "应装配 ECH 通道，实际 %T", rt.ech)
 
 	for host := range apiHostnames {
-		ways := rt.ways(host)
-		require.NotEmpty(t, ways, "主机 %s 应有候选方式", host)
-		assert.Equal(t, wayECH, ways[0].id, "主机 %s 首选应为 ECH", host)
-		assert.Same(t, ech, ways[0].rt, "主机 %s 应复用同一份 ECH 通道", host)
+		var candidates = rt.ways(host)
+		require.NotEmpty(t, candidates, "主机 %s 应有候选方式", host)
+		assert.Equal(t, []way{wayECH, wayNoSNI, wayPlain}, wayIDs(candidates), "主机 %s 的候选顺序", host)
+		assert.Same(t, ech, candidates[0].rt, "主机 %s 应复用同一份 ECH 通道", host)
 	}
 	for host := range imageHostnames {
-		ways := rt.ways(host)
-		require.NotEmpty(t, ways, "主机 %s 应有候选方式", host)
-		assert.Equal(t, wayNoSNI, ways[0].id, "图片主机 %s 首选应是不发送 SNI", host)
+		var candidates = rt.ways(host)
+		require.NotEmpty(t, candidates, "主机 %s 应有候选方式", host)
+		assert.Equal(t, []way{wayNoSNI, wayPlain}, wayIDs(candidates), "图片主机 %s 的候选顺序", host)
 	}
+}
+
+// wayIDs 取出候选方式的标识，供断言候选顺序。
+func wayIDs(ways []candidate) []way {
+	var ids = make([]way, len(ways))
+	for i, c := range ways {
+		ids[i] = c.id
+	}
+	return ids
 }
 
 // TestNewRoutedTransportAppliesECHToCloudflareHost 断言 API 通道上的 ECH
@@ -446,9 +539,45 @@ func TestNewRoutedTransportWithPlainRoundTripper(t *testing.T) {
 // 校验通过的用例传该名字，需要观察「证书与主机不匹配」的用例传其他名字。
 func testTLSServer(t *testing.T, host string, serverName *atomic.Value) (base *http.Transport, rawURL string) {
 	t.Helper()
-	server := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
+	base, rawURL = testTLSServerWithStatus(t, host, http.StatusOK, serverName)
+	return base, rawURL
+}
+
+// testTLSServerWithStatus 与 [testTLSServer] 相同，但让服务端以指定状态码应答，
+// 用于观测原语对不同状态的处理。
+func testTLSServerWithStatus(
+	t *testing.T, host string, status int, serverName *atomic.Value,
+) (base *http.Transport, rawURL string) {
+	t.Helper()
+	var server = newTLSServer(t, statusHandler(status), serverName)
+	base = dialTo(server)
+	base.TLSClientConfig.RootCAs.AddCert(server.Certificate())
+	return base, "https://" + host + "/"
+}
+
+// dialTo 返回把任意目标都拨到给定服务端的传输，使请求无论带什么主机名都能抵达
+// 该服务端。只关心 SNI 与证书主机名的处理，因此跳过标准库的证书校验：本地服务端的
+// 自签证书不在系统根证书里，否则校验会先于本次断言的目标失败。
+// 证书链与主机名由叠加其上的原语负责（见 transport_no_sni.go）。
+func dialTo(server *httptest.Server) *http.Transport {
+	base := defaultBaseTransport()
+	// 拨号被重定向到本地测试服务端，代理会破坏这一劫持，因此显式禁用，
+	// 使测试不受 HTTPS_PROXY 等代理环境变量影响。
+	base.Proxy = nil
+	base.DialContext = func(ctx context.Context, network, _ string) (net.Conn, error) {
+		var d net.Dialer
+		return d.DialContext(ctx, network, server.Listener.Addr().String())
+	}
+	base.TLSClientConfig.InsecureSkipVerify = true
+	base.TLSClientConfig.RootCAs = x509.NewCertPool()
+	return base
+}
+
+// newTLSServer 启动一个本地 TLS 服务端，记录握手收到的 SNI 并以 handler 应答。
+// 服务端监听在真实地址上，因此需要经代理抵达它的用例可以直接转发到它。
+func newTLSServer(t *testing.T, handler http.Handler, serverName *atomic.Value) *httptest.Server {
+	t.Helper()
+	var server = httptest.NewUnstartedServer(handler)
 	server.TLS = &tls.Config{
 		GetConfigForClient: func(hello *tls.ClientHelloInfo) (*tls.Config, error) {
 			serverName.Store(hello.ServerName)
@@ -457,37 +586,69 @@ func testTLSServer(t *testing.T, host string, serverName *atomic.Value) (base *h
 	}
 	server.StartTLS()
 	t.Cleanup(server.Close)
-
-	var addr = server.Listener.Addr().String()
-	base = defaultBaseTransport()
-	// 拨号被重定向到本地测试服务端，代领会破坏这一劫持，因此显式禁用，
-	// 使测试不受 HTTPS_PROXY 等代理环境变量影响。
-	base.Proxy = nil
-	base.DialContext = func(ctx context.Context, network, _ string) (net.Conn, error) {
-		var d net.Dialer
-		return d.DialContext(ctx, network, addr)
-	}
-	// 只关心 SNI 与证书主机名的处理，因此跳过标准库的证书校验：本地服务端的
-	// 自签证书不在系统根证书里，否则校验会先于本次断言的目标失败。
-	// 证书链与主机名由 NewNoSNITransport 叠加的校验负责（见 transport_no_sni.go）。
-	base.TLSClientConfig.InsecureSkipVerify = true
-	base.TLSClientConfig.RootCAs = x509.NewCertPool()
-	base.TLSClientConfig.RootCAs.AddCert(server.Certificate())
-	return base, "https://" + host + "/"
+	return server
 }
 
-// TestTransportPrimitivesCompose 断言原语嵌套后请求按预期经过各层：
-// 经两层无 SNI 原语发出的请求仍能完成握手，且服务端观测不到 SNI。
+// statusHandler 以指定状态码应答。应答带非空正文：观测「响应体是否被关闭」
+// 需要非空的正文。
+func statusHandler(status int) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(status)
+		w.Write([]byte("pixiv"))
+	})
+}
+
+// TestTransportPrimitivesCompose 断言原语嵌套组合后请求按预期经过各层：
+// 经「目标别名 + 不发送 SNI」两层原语发出的请求仍能完成握手，且服务端观测不到 SNI。
 func TestTransportPrimitivesCompose(t *testing.T) {
 	var serverName atomic.Value
 	base, rawURL := testTLSServer(t, "example.com", &serverName)
 
-	client := &http.Client{Transport: NewNoSNITransport(NewNoSNITransport(base))}
+	client := &http.Client{Transport: NewNoSNITransport(NewHostAliasTransport(base, nil))}
 	resp, err := client.Get(rawURL)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "", serverName.Load(), "嵌套组合后仍不应发送 SNI")
+}
+
+// TestNoSNITransportReportsForbiddenAsError 断言服务端以 403 拒绝时原语报错，
+// 而不是把该响应交给调用者：不发送 SNI 的握手不含主机名，服务端只能落到默认
+// server block，它给出的 403 是这条腿对该主机不可用的证据，不是应答。
+func TestNoSNITransportReportsForbiddenAsError(t *testing.T) {
+	var serverName atomic.Value
+	base, rawURL := testTLSServerWithStatus(t, "example.com", http.StatusForbidden, &serverName)
+
+	client := &http.Client{Transport: NewNoSNITransport(base)}
+	_, err := client.Get(rawURL)
+	require.Error(t, err, "403 应报为错误而不是把响应交给调用者")
+
+	var rej *ErrAPIRejected
+	require.ErrorAs(t, err, &rej, "错误应可取回被拒响应的状态")
+	require.NotNil(t, rej.Response)
+	assert.Equal(t, http.StatusForbidden, rej.Response.StatusCode, "状态信息应可读")
+	// 响应已不可用，其正文必须已关闭，否则连接与内存都泄漏给一个没人会消费的正文。
+	n, readErr := rej.Response.Body.Read(make([]byte, 8))
+	assert.Zero(t, n, "转成错误时响应体必须关闭")
+	assert.ErrorContains(t, readErr, "closed")
+}
+
+// TestNoSNITransportPassesThroughOtherStatuses 断言 403 之外的响应原样返回：
+// 扩大报错范围需要有对应的实测依据，业务状态码（404、429、503）不是腿不可用的证据。
+func TestNoSNITransportPassesThroughOtherStatuses(t *testing.T) {
+	for _, status := range []int{http.StatusOK, http.StatusNotFound, http.StatusTooManyRequests, http.StatusServiceUnavailable} {
+		t.Run(http.StatusText(status), func(t *testing.T) {
+			var serverName atomic.Value
+			base, rawURL := testTLSServerWithStatus(t, "example.com", status, &serverName)
+
+			client := &http.Client{Transport: NewNoSNITransport(base)}
+			resp, err := client.Get(rawURL)
+			require.NoError(t, err, "403 之外的响应不应报错")
+			defer resp.Body.Close()
+			assert.Equal(t, status, resp.StatusCode)
+			assert.Equal(t, "", serverName.Load(), "不发送 SNI 的能力不受影响")
+		})
+	}
 }
 
 // TestNewNoSNITransportSuppressesSNI 断言原语确实不发送 SNI：
@@ -520,29 +681,21 @@ func TestDefaultTransportBaselineSendsSNI(t *testing.T) {
 
 // TestNewNoSNITransportDoesNotMutateBase 断言原语克隆基础传输，
 // 因此可与其他原语嵌套组合且不改变调用者的传输。
+//
+// 在接缝上表达：不发送 SNI 的能力只出现在原语上，调用者的 base 仍照常发送 SNI。
 func TestNewNoSNITransportDoesNotMutateBase(t *testing.T) {
-	base := defaultBaseTransport()
-	base.TLSClientConfig.VerifyPeerCertificate = func(rawCerts [][]byte, verifiedChains [][]*x509.Certificate) error {
-		return nil
-	}
-	baseDial := base.DialContext
-	baseVerify := base.TLSClientConfig.VerifyPeerCertificate
+	var serverName atomic.Value
+	base, rawURL := testTLSServer(t, "example.com", &serverName)
 
-	rt := NewNoSNITransport(base)
+	resp, err := (&http.Client{Transport: NewNoSNITransport(base)}).Get(rawURL)
+	require.NoError(t, err)
+	resp.Body.Close()
+	assert.Equal(t, "", serverName.Load(), "原语应返回克隆而非改动调用者的传输")
 
-	assert.NotSame(t, base, rt, "应返回克隆而非改动调用者的传输")
-	assert.Equal(t, "", base.TLSClientConfig.ServerName, "不应改变调用者基础传输的 ServerName")
-	assert.False(t, base.TLSClientConfig.InsecureSkipVerify, "不应改变调用者基础传输的校验开关")
-	assert.NotNil(t, baseVerify, "不应移除调用者基础传输的校验回调")
-	assert.NotNil(t, baseDial, "不应移除调用者基础传输的拨号函数")
-
-	require.NotNil(t, rt.TLSClientConfig)
-	assert.Equal(t, noSNIServerName, rt.TLSClientConfig.ServerName)
-
-	// 可嵌套：在已叠加的传输之上再叠加一次仍然可用且各自独立。
-	again := NewNoSNITransport(rt)
-	require.NotNil(t, again.TLSClientConfig)
-	assert.Equal(t, noSNIServerName, again.TLSClientConfig.ServerName)
+	resp, err = (&http.Client{Transport: base}).Get(rawURL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.NotEqual(t, "", serverName.Load(), "调用者的传输应保持原样，仍照常发送 SNI")
 }
 
 // TestNewNoSNITransportKeepsCallerVerification 断言调用者原有的证书校验回调
@@ -562,32 +715,44 @@ func TestNewNoSNITransportKeepsCallerVerification(t *testing.T) {
 		return errors.New("stub: 调用者的校验拒绝")
 	}
 
-	rt := NewNoSNITransport(base)
-	require.NotNil(t, rt.TLSClientConfig.VerifyPeerCertificate)
-
+	client := &http.Client{Transport: NewNoSNITransport(base)}
 	// 证书链本身可信（已放入 RootCAs），因此叠加的校验通过，
-	// 随后调用者的回调被执行并拒绝。
-	err := rt.TLSClientConfig.VerifyPeerCertificate([][]byte{cert.Raw}, nil)
+	// 随后调用者的回调被执行并拒绝——经一次真实握手在接缝上表达。
+	_, err := client.Get(server.URL)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "stub: 调用者的校验拒绝")
 	assert.True(t, called, "调用者的校验回调应被执行")
 }
 
-// TestNewNoSNITransportDoesNotUseDialTLS 断言原语不用 DialTLSContext：
-// 该手段在经代理的请求上会被静默忽略，能力不生效。
-func TestNewNoSNITransportDoesNotUseDialTLS(t *testing.T) {
-	rt := NewNoSNITransport(defaultBaseTransport())
-	assert.Nil(t, rt.DialTLSContext)
-	assert.Nil(t, rt.DialTLS)
-	require.NotNil(t, rt.TLSClientConfig, "TLS 层能力应由 TLSClientConfig 施加")
+// TestNewNoSNITransportKeepsCapabilityBehindProxy 断言经代理时
+// 不发送 SNI 的能力仍然生效：它由 TLS 客户端配置承载，而非 DialTLSContext
+// ——标准库明确后者只对 non-proxied 请求生效，存在代理时会被静默忽略。
+func TestNewNoSNITransportKeepsCapabilityBehindProxy(t *testing.T) {
+	// 走真实地址而不是 testTLSServer 的拨号劫持：经代理时客户端先拨代理，
+	// 劫持会把 CONNECT 请求直接送到 TLS 服务端。
+	var serverName atomic.Value
+	var server = newTLSServer(t, statusHandler(http.StatusOK), &serverName)
+	proxyURL, err := url.Parse(newECHTestProxy(t, server.Listener.Addr().String()).url)
+	require.NoError(t, err)
+
+	base := defaultBaseTransport()
+	base.TLSClientConfig.InsecureSkipVerify = true
+	base.Proxy = http.ProxyURL(proxyURL)
+
+	client := &http.Client{Transport: NewNoSNITransport(base)}
+	resp, err := client.Get(server.URL)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "", serverName.Load(), "经代理时仍不应发送 SNI")
 }
 
 // TestNewNoSNITransportNilBase 断言未提供基础传输时使用进程默认传输。
 func TestNewNoSNITransportNilBase(t *testing.T) {
-	rt := NewNoSNITransport(nil)
-	require.NotNil(t, rt)
-	require.NotNil(t, rt.TLSClientConfig)
-	assert.Equal(t, noSNIServerName, rt.TLSClientConfig.ServerName)
+	// 进程默认传输没有把请求劫持到本地，因此这里只断言原语可用：
+	// base 为空时不得返回空 RoundTripper 或 panic。
+	var rt http.RoundTripper = NewNoSNITransport(nil)
+	assert.NotNil(t, rt)
 }
 
 // TestNewNoSNITransportVerifiesCertificateChain 断言不发送 SNI 时
@@ -599,20 +764,17 @@ func TestNewNoSNITransportVerifiesCertificateChain(t *testing.T) {
 	t.Cleanup(server.Close)
 
 	// 用系统根证书校验自签证书，应当失败。
-	rt := NewNoSNITransport(defaultBaseTransport())
-	client := &http.Client{Transport: rt}
+	client := &http.Client{Transport: NewNoSNITransport(defaultBaseTransport())}
 	_, err := client.Get(server.URL)
 	require.Error(t, err, "自签证书不应通过校验")
 
-	// 放入该服务端的根证书后应能通过，说明校验确实按证书链进行。
+	// 在 base 上放入该服务端的根证书后应能通过，说明校验确实按证书链进行。
 	// 主机名不在这里校验（原语不知道目标主机名），由路由层在收到响应后补齐，
 	// 见 TestRoutedTransportVerifiesImageHostname。
-	pool := x509.NewCertPool()
-	pool.AddCert(server.Certificate())
-	rt = NewNoSNITransport(defaultBaseTransport())
-	rt.TLSClientConfig.RootCAs = pool
-	rt.TLSClientConfig.VerifyPeerCertificate = verifyPeerCertificate(pool)
-	client = &http.Client{Transport: rt}
+	base := defaultBaseTransport()
+	base.TLSClientConfig.RootCAs = x509.NewCertPool()
+	base.TLSClientConfig.RootCAs.AddCert(server.Certificate())
+	client = &http.Client{Transport: NewNoSNITransport(base)}
 	resp, err := client.Get(server.URL)
 	require.NoError(t, err)
 	defer resp.Body.Close()

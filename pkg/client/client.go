@@ -68,7 +68,8 @@ func (c *Client) GetWithContext(ctx context.Context, url string) (resp *http.Res
 // [CheckAPIResponse] 同样返回本类型。
 //
 // Response 是唯一的状态来源：状态码、状态行、请求 URI、响应头都在其中。
-// 其 Body 从不被本库的拒绝路径读取；[ParseAPIResponseV2] 报错时已关闭它，
+// 其 Body 从不被本库的拒绝路径读取：[ParseAPIResponseV2] 报错时已关闭它，
+// [NewNoSNITransport] 把它从拒绝响应转成错误时也已关闭它，
 // 直接使用 [CheckAPIResponse] 的调用方要自己负责关闭。
 type ErrAPIRejected struct {
 	// Response 是被拒绝的响应，仅供读取元数据。

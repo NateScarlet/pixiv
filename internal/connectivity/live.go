@@ -99,6 +99,10 @@ func (p liveProber) ProbeHTTPS(ctx context.Context, rawURL string, viaProxy bool
 	return probeOnce(ctx, t, rawURL)
 }
 
+// probeReferer 是探测 no-SNI 通道时携带的 Referer，与 client.FetchImage 取图时
+// 附加的相同（见 pkg/client/image.go）：图片主机对不带 Referer 的请求一律拒绝。
+const probeReferer = "https://www.pixiv.net/"
+
 // ProbeECH implements Prober.
 //
 // 与运行时 API 通道共享同一构造：NewECHTransport(nil) 让原语自建 base
@@ -110,7 +114,7 @@ func (p liveProber) ProbeECH(ctx context.Context, host string) error {
 		client.WithTransport(client.NewECHTransport(nil)),
 		client.WithDNSResolver(p.resolver),
 	)
-	return probeWithClient(ctx, c, fmt.Sprintf("https://%s/", host))
+	return probeWithClient(ctx, c, fmt.Sprintf("https://%s/", host), nil)
 }
 
 // ProbeNoSNI implements Prober.
@@ -118,6 +122,11 @@ func (p liveProber) ProbeECH(ctx context.Context, host string) error {
 // 与运行时 no-SNI 通道共享同一构造：用带目标别名的 base（见 client.NoSNIHostTarget）
 // 叠加不发送 SNI 的原语，解析器经 WithDNSResolver 注入——请求 Host:www.pixiv.net
 // 时落到 pixiv.net 源站，与 AutoTransport 的 no-SNI 腿一致。
+//
+// 探测带 Referer，与 client.FetchImage 的取图正向路径一致：图片主机对不带 Referer
+// 的请求一律以 403 拒绝（实测），而 client.NewNoSNITransport 把 403 报为「这条腿
+// 不可用」——不带 Referer 时探测测到的是该判定，而不是这条腿本身。API 主机不受
+// Referer 影响（实测补 Referer 仍是同一个 403），因此同一个探测对两类主机都有效。
 func (p liveProber) ProbeNoSNI(ctx context.Context, host string) error {
 	c := client.New(
 		// 与运行时 no-SNI 通道一致：请求 Host:www.pixiv.net 时拨号解析到 pixiv.net
@@ -127,27 +136,34 @@ func (p liveProber) ProbeNoSNI(ctx context.Context, host string) error {
 		)),
 		client.WithDNSResolver(p.resolver),
 	)
-	return probeWithClient(ctx, c, fmt.Sprintf("https://%s/", host))
+	return probeWithClient(ctx, c, fmt.Sprintf("https://%s/", host), http.Header{"Referer": {probeReferer}})
 }
 
 // probeOnce 用给定传输发出一次 GET 请求并丢弃响应体。
 //
-// 成功标准是「收到 HTTP 应答」：连接层可用即成功，业务状态码（如图片
-// 主机对无 Referer 请求的 403）不构成探测失败。
+// 成功标准是「收到 HTTP 应答」：连接层可用即成功，业务状态码（如图片主机对无
+// Referer 请求的 403）不构成探测失败。经 NewNoSNITransport 的探测例外：那条腿
+// 把 403 报为错误（见 ProbeNoSNI），因此那里的 403 是探测失败。
 func probeOnce(ctx context.Context, rt http.RoundTripper, rawURL string) error {
 	c := &http.Client{Transport: rt}
-	return probeWithClient(ctx, c, rawURL)
+	return probeWithClient(ctx, c, rawURL, nil)
 }
 
 // probeWithClient 用给定客户端发出一次 GET 请求并丢弃响应体，成功标准同上。
 //
-// client.Client 内嵌 http.Client，因此两者都以接口约束传入。
+// client.Client 内嵌 http.Client，因此两者都以接口约束传入。header 为 nil 时
+// 不附加任何请求头。
 func probeWithClient(ctx context.Context, c interface {
 	Do(req *http.Request) (*http.Response, error)
-}, rawURL string) error {
+}, rawURL string, header http.Header) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, rawURL, nil)
 	if err != nil {
 		return err
+	}
+	for k, vs := range header {
+		for _, v := range vs {
+			req.Header.Add(k, v)
+		}
 	}
 	resp, err := c.Do(req)
 	if err != nil {

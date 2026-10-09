@@ -150,6 +150,8 @@ SNI 阻断机制
 （``ServerName`` 设为 IP 字面量，``crypto/tls`` 对 IP 字面量不生成 SNI 扩展）。
 它不使用 ``DialTLSContext``：标准库文档明确后者只对 non-proxied 请求生效，
 存在代理时被静默忽略。
+该原语另有一条判定：服务端以 403 拒绝时报为错误而不是把响应交给调用者，
+理由见下文源站一节。
 
 ``NewRoutedTransport`` 持有「哪些主机该用哪种方式」的清单，目前有两类：
 ``i.pximg.net`` 走不发送 SNI 的方式；``www.pixiv.net`` 与 ``app-api.pixiv.net``
@@ -172,15 +174,30 @@ SNI 阻断机制
 替换：默认传输对 ``www.pixiv.net`` 的 no-SNI 腿使用带目标别名的底层
 （``NewHostAliasTransport``，见 `client.NoSNIHostTarget`_）——请求 ``Host:www.pixiv.net``、
 拨号解析到 ``pixiv.net`` 源站；ECH 与常规仍解析 ``www.pixiv.net``（Cloudflare）。
-两者由此可以同时可用：``pixiv-doctor`` 在同一环境下实测 `API 主机 ECH 直连` 与
-`API 主机无 SNI 直连` 均成功。``www.pixiv.net`` 被污染时 ECH 失败，no-SNI 仍经源站可用。
+两条腿由此可以同时拨通：``www.pixiv.net`` 被污染时 ECH 失败，no-SNI 仍经源站完成握手。
 
-源站接受不发送 SNI 的握手、证书 ``*.pixiv.net`` 也能通过主机名校验；实测经 no-SNI
-连接源站，TLS 握手与证书校验均通过、能建立 HTTP 应答（根路径返回 nginx 的
-``403 Forbidden``，与 ``i.pximg.net`` 常规表现一致），但 API 路径的宽容度由服务端策略
-决定，需在真实请求下验证（``pixiv-doctor`` 的 `API 主机无 SNI 直连` 探测反映连接层
-可用性）。调用者**显式**提供传输时，其中的传输是明确指令，API 主机只走 ECH，不套
-该 no-SNI 别名。
+源站接受不发送 SNI 的握手、证书 ``*.pixiv.net`` 也能通过主机名校验，但它在 HTTP 层
+拒绝 API 主机的请求。2026-10-09 实测经 no-SNI 连接 ``pixiv.net`` 源站：TLS 握手与
+证书校验均通过，随后 nginx 对**一切路径**——根路径、``/ajax/search/novels/...``、
+``/ajax/novel/...``、``/ajax/illust/.../pages``、``/ranking.php``——返回同一个
+``403 Forbidden`` 默认页面，补 ``Referer`` 也不改变。逐个源站地址测试（不发送 SNI 的
+握手加 ``Host: www.pixiv.net``）结果一致，不是个别节点的问题。
+
+该 403 是 nginx **默认 server block** 的拒绝，**不构成「连接层可用」的证据**：不带 SNI
+时服务端拿不到主机名，只能落到默认配置，HTTP 的 ``Host`` 头改变不了这一点。
+因此不能把「握手完成、根路径有应答」当作 no-SNI 对该主机可用的依据。
+
+``NewNoSNITransport`` 据此把 403 报为错误（响应体随即关闭，状态可经 ``errors.As`` 以
+``ErrAPIRejected`` 取回）。「这条腿对该主机不可用」是这条腿自己的知识，因此由它自己
+判定：``AutoTransport`` 的候选循环不含任何按状态码的逻辑，它的判据仍是「有无传输错误」，
+在本原语报错后这条判据就是正确的。效果是 ECH 抖动后回落到该腿时，请求会继续尝试
+常规连接，而不是把 403 当成可用方式记住并在整个进程生命周期复用。
+
+**该结论是 2026-10-09 单日、单环境的实测**，而该机制此前是可用的：这个 403 是服务端的
+持久策略还是暂时现象**尚未确定**。因此库的候选方式列表未据此调整——no-SNI 腿仍留在
+API 主机的候选里，两个方向都不会错：它若确实可用仍会被用到，若不可用则会被上面的判定
+换掉且不被记忆。``pixiv-doctor`` 的 `API 主机无 SNI 直连` 探测用于持续判断这一点。
+调用者**显式**提供传输时，其中的传输是明确指令，API 主机只走 ECH，不套该 no-SNI 别名。
 
 ECH (Encrypted Client Hello)
 --------------------------------

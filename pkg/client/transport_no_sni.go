@@ -24,10 +24,17 @@ const noSNIServerName = "0.0.0.0"
 // 不发送 SNI 后标准库无法自动按主机名校验证书，因此本原语改为自行校验证书链。
 // 由于原语不知道目标主机名，它只校验证书链；主机名校验需要知道请求主机，
 // 由 [NewRoutedTransport] 在收到响应后补齐。
-// 需要更严格的校验时，调用者可在返回的传输上自行设置 VerifyPeerCertificate。
+// 需要更严格的校验时，调用者可在 base 上自行设置 VerifyPeerCertificate。
 //
-// 返回的传输克隆自 base，因此可与其他原语嵌套组合，且不改变调用者的 base。
-func NewNoSNITransport(base *http.Transport) *http.Transport {
+// 服务端以 403 拒绝时本原语报错而不是把响应交给调用者：不发送 SNI 的握手不含
+// 主机名，服务端只能落到默认 server block，因此这类 403 是「这条腿对该主机
+// 不可用」的证据。调用者拿到的错误经 errors.As 可取回 [*ErrAPIRejected]（其中的
+// 响应体已关闭，仅供读取状态）。业务状态码不构成拒绝这条腿的证据，原样返回。
+//
+// 返回的传输是承载上述能力的不透明 [http.RoundTripper]：它克隆自 base，因此可与
+// 其他原语嵌套组合，且不改变调用者的 base。调用者只依赖 http.RoundTripper，
+// 库不暴露底层传输。
+func NewNoSNITransport(base *http.Transport) *noSNITransport {
 	if base == nil {
 		// 未指定时使用进程默认传输。本原语不承担解析：需要经注入的解析器或
 		// 不同的解析目标（别名）时，由调用者用 NewHostAliasTransport 组合 base。
@@ -51,7 +58,32 @@ func NewNoSNITransport(base *http.Transport) *http.Transport {
 	}
 	t.TLSClientConfig = cfg
 	// 拨号与解析（含目标主机别名）全部委托给 base，本原语只叠加「不发送 SNI」。
-	return t
+	return &noSNITransport{base: t}
+}
+
+// noSNITransport 承载「不发送 SNI」与「被服务端拒绝即报错」两种能力。
+//
+// 判定放在这里而不是自动选择传输的候选循环里：它最清楚自己是什么腿，也最清楚
+// 自己何时被服务端拒绝。调用者只把它当作 [http.RoundTripper] 使用。
+type noSNITransport struct {
+	base *http.Transport
+}
+
+// RoundTrip implements http.RoundTripper
+func (t *noSNITransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := t.base.RoundTrip(req)
+	if err != nil || resp.StatusCode != http.StatusForbidden {
+		return resp, err
+	}
+	// 响应不可用，关闭它以免连接与正文泄漏给一个没人会消费的应答；
+	// 关闭失败也是调用者可见的诊断信息。
+	return nil, errors.Join(&ErrAPIRejected{Response: resp}, resp.Body.Close())
+}
+
+// CloseIdleConnections 关闭空闲连接，使 [http.Client.CloseIdleConnections] 对本
+// 传输仍然有效——否则调用者只能经 http.RoundTripper 使用本原语，无从释放连接。
+func (t *noSNITransport) CloseIdleConnections() {
+	t.base.CloseIdleConnections()
 }
 
 // chainVerifyPeerCertificate 依次执行两个校验回调，任一失败即返回该错误。
