@@ -62,8 +62,8 @@ func TestFetchImageLiveWithoutRefererIsRejected(t *testing.T) {
 	require.NoError(t, err)
 	resp, err := c.Do(req)
 	if err != nil {
-		// 拒绝不一定以响应形式出现：不发送 SNI 的腿把 403 报为「这条腿不可用」
-		// （该判定不区分主机，见 transport_no_sni.go），常规腿被阻断时即为此形态。
+		// 拒绝不一定以响应形式出现：不发送 SNI 的传输把 403 报为「该传输不可用」
+		// （该判定不区分主机，见 transport_no_sni.go），常规传输被阻断时即为此形态。
 		var rej *ErrAPIRejected
 		require.ErrorAs(t, err, &rej, "不被接受的请求应以拒绝的形式报错")
 		assert.Equal(t, http.StatusForbidden, rej.Response.StatusCode)

@@ -121,11 +121,11 @@ func (p liveProber) ProbeECH(ctx context.Context, host string) error {
 //
 // 与运行时 no-SNI 通道共享同一构造：用带目标别名的 base（见 client.NoSNIHostTarget）
 // 叠加不发送 SNI 的原语，解析器经 WithDNSResolver 注入——请求 Host:www.pixiv.net
-// 时落到 pixiv.net 源站，与 AutoTransport 的 no-SNI 腿一致。
+// 时落到 pixiv.net 源站，与 AutoTransport 的 no-SNI 传输一致。
 //
 // 探测带 Referer，与 client.FetchImage 的取图正向路径一致：图片主机对不带 Referer
-// 的请求一律以 403 拒绝（实测），而 client.NewNoSNITransport 把 403 报为「这条腿
-// 不可用」——不带 Referer 时探测测到的是该判定，而不是这条腿本身。API 主机不受
+// 的请求一律以 403 拒绝（实测），而 client.NewNoSNITransport 把 403 报为「该传输
+// 不可用」——不带 Referer 时探测测到的是该判定，而不是该传输本身。API 主机不受
 // Referer 影响（实测补 Referer 仍是同一个 403），因此同一个探测对两类主机都有效。
 func (p liveProber) ProbeNoSNI(ctx context.Context, host string) error {
 	c := client.New(
@@ -142,7 +142,7 @@ func (p liveProber) ProbeNoSNI(ctx context.Context, host string) error {
 // probeOnce 用给定传输发出一次 GET 请求并丢弃响应体。
 //
 // 成功标准是「收到 HTTP 应答」：连接层可用即成功，业务状态码（如图片主机对无
-// Referer 请求的 403）不构成探测失败。经 NewNoSNITransport 的探测例外：那条腿
+// Referer 请求的 403）不构成探测失败。经 NewNoSNITransport 的探测例外：该传输
 // 把 403 报为错误（见 ProbeNoSNI），因此那里的 403 是探测失败。
 func probeOnce(ctx context.Context, rt http.RoundTripper, rawURL string) error {
 	c := &http.Client{Transport: rt}

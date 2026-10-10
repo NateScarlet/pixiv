@@ -27,9 +27,9 @@ const noSNIServerName = "0.0.0.0"
 // 需要更严格的校验时，调用者可在 base 上自行设置 VerifyPeerCertificate。
 //
 // 服务端以 403 拒绝时本原语报错而不是把响应交给调用者：不发送 SNI 的握手不含
-// 主机名，服务端只能落到默认 server block，因此这类 403 是「这条腿对该主机
+// 主机名，服务端只能落到默认 server block，因此这类 403 是「该传输对该主机
 // 不可用」的证据。调用者拿到的错误经 errors.As 可取回 [*ErrAPIRejected]（其中的
-// 响应体已关闭，仅供读取状态）。业务状态码不构成拒绝这条腿的证据，原样返回。
+// 响应体已关闭，仅供读取状态）。业务状态码不构成拒绝该传输的证据，原样返回。
 //
 // 返回的传输是承载上述能力的不透明 [http.RoundTripper]：它克隆自 base，因此可与
 // 其他原语嵌套组合，且不改变调用者的 base。调用者只依赖 http.RoundTripper，
@@ -63,8 +63,8 @@ func NewNoSNITransport(base *http.Transport) *noSNITransport {
 
 // noSNITransport 承载「不发送 SNI」与「被服务端拒绝即报错」两种能力。
 //
-// 判定放在这里而不是自动选择传输的候选循环里：它最清楚自己是什么腿，也最清楚
-// 自己何时被服务端拒绝。调用者只把它当作 [http.RoundTripper] 使用。
+// 判定放在这里而不是自动选择传输的候选循环里：它最清楚自己是哪种连接方式，
+// 也最清楚自己何时被服务端拒绝。调用者只把它当作 [http.RoundTripper] 使用。
 type noSNITransport struct {
 	base *http.Transport
 }

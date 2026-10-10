@@ -302,10 +302,10 @@ func TestAutoTransportPrefersLastWorkingWay(t *testing.T) {
 	assert.Zero(t, atomic.LoadInt32(&echCalls), "已确认 ECH 不可用，后续请求不应再尝试")
 }
 
-// TestAutoTransportSkipsRejectedNoSNILeg 断言服务端拒绝不发送 SNI 的腿之后，
-// 自动选择既不会把那条腿的拒绝当成可用、也不会把它留在后续请求的首选：
+// TestAutoTransportSkipsRejectedNoSNITransport 断言服务端拒绝不发送 SNI 的传输之后，
+// 自动选择既不会把该传输的拒绝当成可用、也不会把它留在后续请求的首选：
 // 这正是「ECH 抖动一次、此后全部 403」的成因。
-func TestAutoTransportSkipsRejectedNoSNILeg(t *testing.T) {
+func TestAutoTransportSkipsRejectedNoSNITransport(t *testing.T) {
 	const host = "api.example.com"
 	var serverName atomic.Value
 	var rejected int32
@@ -320,7 +320,7 @@ func TestAutoTransportSkipsRejectedNoSNILeg(t *testing.T) {
 		rt.ech = roundTripperFunc(func(*http.Request) (*http.Response, error) {
 			return nil, errors.New("stub: ECH 不可用")
 		})
-		// 真实的 noSNI 腿：拨到以 403 一律拒绝的本地服务端。
+		// 真实的 noSNI 传输：拨到以 403 一律拒绝的本地服务端。
 		rt.nosni = NewNoSNITransport(dialTo(rejecting))
 		rt.base = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
 			return okResponse(req), nil
@@ -330,12 +330,12 @@ func TestAutoTransportSkipsRejectedNoSNILeg(t *testing.T) {
 	client := &http.Client{Transport: rt}
 	for i := range 2 {
 		resp, err := client.Get("https://" + host + "/ajax/search/novels/x")
-		require.NoError(t, err, "第 %d 次请求：被拒绝的腿应让路给其余方式", i+1)
+		require.NoError(t, err, "第 %d 次请求：被拒绝的传输应让路给其余方式", i+1)
 		resp.Body.Close()
 		assert.Equal(t, http.StatusOK, resp.StatusCode)
 	}
 	assert.Equal(t, int32(1), atomic.LoadInt32(&rejected),
-		"被拒绝的腿只应在首次请求中被尝试一次，后续请求不应再复用它")
+		"被拒绝的传输只应在首次请求中被尝试一次，后续请求不应再复用它")
 }
 
 // TestAutoTransportUsesSingleECHChannel 断言所有 API 主机复用同一份 ECH 通道，
@@ -614,7 +614,7 @@ func TestTransportPrimitivesCompose(t *testing.T) {
 
 // TestNoSNITransportReportsForbiddenAsError 断言服务端以 403 拒绝时原语报错，
 // 而不是把该响应交给调用者：不发送 SNI 的握手不含主机名，服务端只能落到默认
-// server block，它给出的 403 是这条腿对该主机不可用的证据，不是应答。
+// server block，它给出的 403 是该传输对该主机不可用的证据，不是应答。
 func TestNoSNITransportReportsForbiddenAsError(t *testing.T) {
 	var serverName atomic.Value
 	base, rawURL := testTLSServerWithStatus(t, "example.com", http.StatusForbidden, &serverName)
@@ -634,7 +634,7 @@ func TestNoSNITransportReportsForbiddenAsError(t *testing.T) {
 }
 
 // TestNoSNITransportPassesThroughOtherStatuses 断言 403 之外的响应原样返回：
-// 扩大报错范围需要有对应的实测依据，业务状态码（404、429、503）不是腿不可用的证据。
+// 扩大报错范围需要有对应的实测依据，业务状态码（404、429、503）不是传输不可用的证据。
 func TestNoSNITransportPassesThroughOtherStatuses(t *testing.T) {
 	for _, status := range []int{http.StatusOK, http.StatusNotFound, http.StatusTooManyRequests, http.StatusServiceUnavailable} {
 		t.Run(http.StatusText(status), func(t *testing.T) {
