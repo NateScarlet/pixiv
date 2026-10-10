@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.11.2](https://github.com/NateScarlet/pixiv/compare/v0.11.1...v0.11.2) (2026-10-10)
+
+
+### Bug Fixes
+
+* **client:** should not remember a rejected no-SNI leg as usable ([31050f5](https://github.com/NateScarlet/pixiv/commit/31050f5cd39ea3b6f671aed547d42a36706bb6e3)), closes [#106](https://github.com/NateScarlet/pixiv/issues/106)
+
 ## [0.11.1](https://github.com/NateScarlet/pixiv/compare/v0.11.0...v0.11.1) (2026-10-03)
 
 
