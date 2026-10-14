@@ -123,26 +123,54 @@ func TestFetchSeriesChapterWithoutThumbnail(t *testing.T) {
 	assert.Equal(t, "", c.AuthorName())
 }
 
-// TestFetchSeriesLive 验证真实匿名接口(2026-09: series 66844 共 250 章)。
-// 匿名接口无需登录;需要网络可用并配合代理访问 pixiv。
+// chapterOrders 返回章节次序列表,用于对整页章节做集合层面的断言。
+func chapterOrders(chapters []ChapterInFetchSeriesPayload) []int64 {
+	orders := make([]int64, 0, len(chapters))
+	for _, c := range chapters {
+		orders = append(orders, c.Order())
+	}
+	return orders
+}
+
+// TestFetchSeriesLive 验证真实匿名接口(series 66844)。
+// 匿名接口无需登录;需要网络可用。
+//
+// 该系列作者持续更新章节(2026-10-03 时已达 251 章),因此不对章节总数与最新作品 ID
+// 做精确断言——它们每次更新都会失效,只会让 CI 反复变红;改为断言与总数无关的结构
+// 关系,并让断言不依赖章节的返回顺序。系列首章不会变更,仍作精确断言。
 func TestFetchSeriesLive(t *testing.T) {
 	testenv.RequireLive(t)
 	ctx := context.Background()
 
 	p, err := FetchSeries(ctx, "66844")
 	require.NoError(t, err)
-	assert.Equal(t, int64(250), p.Total())
+	// 首章固定不变,用于确认元数据匹配到的是请求的系列。
 	assert.Equal(t, "77481424", p.FirstIllustID())
-	assert.Equal(t, "149834895", p.LatestIllustID())
 	assert.NotEmpty(t, p.Title())
 
+	total := p.Total()
+	require.Positive(t, total)
 	chapters := slices.Collect(p.Chapters())
 	require.NotEmpty(t, chapters)
-	assert.Equal(t, int64(250), chapters[0].Order())
+	orders := chapterOrders(chapters)
+	// 第 1 页以最新一章结尾(次序等于章节总数),其余章节次序不小于 1。
+	assert.Equal(t, total, slices.Max(orders))
+	assert.GreaterOrEqual(t, slices.Min(orders), int64(1))
+	// 元数据里的最新作品 ID 与章节列表里次序等于总数的那一章一致。
+	var latestID string
+	for _, c := range chapters {
+		if c.Order() == total {
+			latestID = c.ID()
+		}
+	}
+	assert.Equal(t, p.LatestIllustID(), latestID)
 
 	p2, err := FetchSeries(ctx, "66844", FetchSeriesWithPage(2))
 	require.NoError(t, err)
 	chapters = slices.Collect(p2.Chapters())
 	require.NotEmpty(t, chapters)
-	assert.Equal(t, int64(238), chapters[0].Order())
+	orders2 := chapterOrders(chapters)
+	// 第 2 页整体排在第 1 页之前,两页章节不重叠。
+	assert.Less(t, slices.Max(orders2), slices.Min(orders))
+	assert.GreaterOrEqual(t, slices.Min(orders2), int64(1))
 }
