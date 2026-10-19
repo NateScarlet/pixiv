@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.11.3](https://github.com/NateScarlet/pixiv/compare/v0.11.2...v0.11.3) (2026-10-19)
+
+
+### Bug Fixes
+
+* **client:** should reach the no-SNI origin alias directly or fail fast ([0146d8c](https://github.com/NateScarlet/pixiv/commit/0146d8ce1919cc7b4b1ae9a3c8a85210f12e3101)), closes [#109](https://github.com/NateScarlet/pixiv/issues/109)
+* **test:** should not fail when the live series gains new chapters ([579f9c9](https://github.com/NateScarlet/pixiv/commit/579f9c911c031b4e4d3c96b9de8d430f0067e8b4))
+
 ## [0.11.2](https://github.com/NateScarlet/pixiv/compare/v0.11.1...v0.11.2) (2026-10-10)
 
 
