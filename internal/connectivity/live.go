@@ -119,9 +119,10 @@ func (p liveProber) ProbeECH(ctx context.Context, host string) error {
 
 // ProbeNoSNI implements Prober.
 //
-// 与运行时 no-SNI 通道共享同一构造：用带目标别名的 base（见 client.NoSNIHostTarget）
-// 叠加不发送 SNI 的原语，解析器经 WithDNSResolver 注入——请求 Host:www.pixiv.net
-// 时落到 pixiv.net 源站，与 AutoTransport 的 no-SNI 传输一致。
+// 用库导出的运行时构造 [client.NewNoSNIAliasTransport]：探测通道与 AutoTransport 的
+// no-SNI 候选是同一份装配，别名与代理的规则（隐式代理忽略、显式代理快速失败）只由
+// 库实现决定，探测因此总是体现当前实现，不会与运行时漂移。解析器经 WithDNSResolver
+// 注入——请求 Host:www.pixiv.net 时落到 pixiv.net 源站。
 //
 // 探测带 Referer，与 client.FetchImage 的取图正向路径一致：图片主机对不带 Referer
 // 的请求一律以 403 拒绝（实测），而 client.NewNoSNITransport 把 403 报为「该传输
@@ -129,11 +130,7 @@ func (p liveProber) ProbeECH(ctx context.Context, host string) error {
 // Referer 影响（实测补 Referer 仍是同一个 403），因此同一个探测对两类主机都有效。
 func (p liveProber) ProbeNoSNI(ctx context.Context, host string) error {
 	c := client.New(
-		// 与运行时 no-SNI 通道一致：请求 Host:www.pixiv.net 时拨号解析到 pixiv.net
-		// 源站（Cloudflare 拒绝 no-SNI 握手，只有源站接受），见 client.NoSNIHostTarget。
-		client.WithTransport(client.NewNoSNITransport(
-			client.NewHostAliasTransport(nil, client.NoSNIHostTarget()),
-		)),
+		client.WithTransport(client.NewNoSNIAliasTransport(nil)),
 		client.WithDNSResolver(p.resolver),
 	)
 	return probeWithClient(ctx, c, fmt.Sprintf("https://%s/", host), http.Header{"Referer": {probeReferer}})

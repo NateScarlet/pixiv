@@ -62,7 +62,8 @@ type Prober interface {
 	ProbeHTTPS(ctx context.Context, rawURL string, viaProxy bool) error
 	// ProbeECH 对 Cloudflare 托管主机施加 ECH 直连。
 	ProbeECH(ctx context.Context, host string) error
-	// ProbeNoSNI 对图片主机以不发送 SNI 的方式直连。
+	// ProbeNoSNI 以不发送 SNI 的方式访问该主机；库持有的源站别名在此生效
+	// （见 client.NoSNIHostTarget），API 与图片主机都经它探测。
 	ProbeNoSNI(ctx context.Context, host string) error
 }
 

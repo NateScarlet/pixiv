@@ -11,6 +11,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -649,6 +650,225 @@ func TestNoSNITransportPassesThroughOtherStatuses(t *testing.T) {
 			assert.Equal(t, "", serverName.Load(), "不发送 SNI 的能力不受影响")
 		})
 	}
+}
+
+// #region 需要源站别名的不发送 SNI 的通道
+
+// aliasProbeHost 与 aliasProbeOrigin 是别名探测用的请求主机与其源站别名。
+//
+// 都不需要真实存在：别名与代理的冲突与主机是否真实无关，用例用拨号劫持或本地代理
+// 把请求引到本地服务端。
+const (
+	aliasProbeHost   = "alias-probe.invalid"
+	aliasProbeOrigin = "origin-probe.invalid"
+	// imageProbeHost 代表不需要别名的主机（图片主机这一类）：直连与经代理落到同一对端。
+	imageProbeHost = "image-probe.invalid"
+)
+
+// TestNoSNIAliasIgnoresImplicitProxy 断言隐式代理（base 由本库自建、代理只来自
+// 进程环境变量）下，需要源站别名的主机仍直达源站。
+//
+// 别名在拨号时才施加（见 [NewHostAliasTransport]），因此只在直连时生效：经代理时
+// 拨号目标是代理地址，别名分支不进入，请求会被代理解析到别名之外的对端，这条通道
+// 就此失去它存在的意义。
+func TestNoSNIAliasIgnoresImplicitProxy(t *testing.T) {
+	var serverName atomic.Value
+	base, rawURL := testTLSServer(t, aliasProbeHost, &serverName)
+	// 代理指向必然失败的地址：若请求真的经它发出，用例会失败。
+	base.Proxy = http.ProxyURL(deadProxyURL(t))
+
+	var mu sync.Mutex
+	var resolved []string
+	// implicit=true：等价于 AutoTransport 自建 base 的情形。
+	rt := newAliasedNoSNITransport(base, true, map[string]string{aliasProbeHost: aliasProbeOrigin})
+	c := New(
+		WithTransport(rt),
+		WithDNSResolver(resolverFunc(func(_ context.Context, host string) ([]net.IP, error) {
+			mu.Lock()
+			resolved = append(resolved, host)
+			mu.Unlock()
+			return []net.IP{net.ParseIP("127.0.0.1")}, nil
+		})),
+	)
+
+	resp, err := c.Get(rawURL)
+	require.NoError(t, err, "隐式代理应被忽略，请求直达源站")
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "", serverName.Load(), "不发送 SNI 的能力不受影响")
+
+	mu.Lock()
+	defer mu.Unlock()
+	assert.Contains(t, resolved, aliasProbeOrigin, "别名应重新生效：解析的是源站")
+}
+
+// TestNewNoSNIAliasTransportNilBaseIsImplicit 断言导出的构造把「未提供 base」
+// 映射为运行时的隐式代理语义（与 [NewECHTransport] 的 nil 处理一致）。
+//
+// 隐式代理的实际行为在内部接缝上验证（TestNoSNIAliasIgnoresImplicitProxy）：
+// 这里无法注入环境代理——默认 base 的 Proxy 来自 ProxyFromEnvironment，而它
+// 有进程级缓存，不适合作为测试前提。
+func TestNewNoSNIAliasTransportNilBaseIsImplicit(t *testing.T) {
+	rt := NewNoSNIAliasTransport(nil)
+	alias, ok := rt.(*aliasedNoSNITransport)
+	require.True(t, ok, "应返回该通道的实现（实际 %T）", rt)
+	assert.True(t, alias.implicitProxy, "未提供 base 时应按库自建处理")
+
+	req, err := http.NewRequest(http.MethodGet, "https://www.pixiv.net/", nil)
+	require.NoError(t, err)
+	assert.False(t, alias.usesProxy(req), "隐式代理下需要别名的主机不应经代理")
+}
+
+// TestNewNoSNIAliasTransportMatchesRuntime 断言导出的构造与 AutoTransport 装配出的
+// no-SNI 候选是同一份语义：调用者提供带代理的 base 时，两者对需要别名的主机给出
+// 同样的错误，且都不先连代理。
+//
+// 诊断工具经该入口复现运行时通道，因此这条等价性是它「总是体现当前实现」的依据。
+func TestNewNoSNIAliasTransportMatchesRuntime(t *testing.T) {
+	base := defaultBaseTransport()
+	base.Proxy = http.ProxyURL(deadProxyURL(t))
+
+	explicit := NewNoSNIAliasTransport(base)
+	rt := &AutoTransport{Base: base}
+	rt.setup()
+
+	req, err := http.NewRequest(http.MethodGet, "https://www.pixiv.net/", nil)
+	require.NoError(t, err)
+	_, explicitErr := explicit.RoundTrip(req)
+	_, runtimeErr := rt.nosni.RoundTrip(req.Clone(req.Context()))
+
+	require.Error(t, explicitErr, "调用者的代理与源站别名冲突时应报错")
+	require.Error(t, runtimeErr, "运行时通道应给出同样的结论")
+	assert.Contains(t, explicitErr.Error(), "源站别名")
+	assert.Equal(t, runtimeErr.Error(), explicitErr.Error(),
+		"探测用的构造应与运行时通道给出相同结论")
+}
+
+// TestNewNoSNIAliasTransportKeepsCallerProxyExplicit 断言调用者传入 base 时，
+// 其中的代理是显式指令：需要别名的主机报错而不是静默经代理发出。
+func TestNewNoSNIAliasTransportKeepsCallerProxyExplicit(t *testing.T) {
+	deadProxy := newECHTestProxy(t, "127.0.0.1:1")
+	base := defaultBaseTransport()
+	base.Proxy = http.ProxyURL(mustProxyURL(t, deadProxy.url))
+
+	_, err := (&http.Client{Transport: NewNoSNIAliasTransport(base)}).Get("https://www.pixiv.net/")
+	require.Error(t, err, "调用者提供的代理与源站别名冲突时应报错")
+	assert.Contains(t, err.Error(), "源站别名")
+	assert.Zero(t, deadProxy.connects.Load(), "报错应发生在发起连接之前")
+}
+
+// TestNoSNIAliasErrorsOnExplicitProxy 断言调用者显式指定代理时快速失败：
+// 别名在代理下无法生效，请求会落到别名之外的对端，此时应报错说明冲突，
+// 而不是发出一次注定打到错误对端的请求。
+func TestNoSNIAliasErrorsOnExplicitProxy(t *testing.T) {
+	deadProxy := newECHTestProxy(t, "127.0.0.1:1")
+	base := defaultBaseTransport()
+	base.Proxy = http.ProxyURL(mustProxyURL(t, deadProxy.url))
+
+	rt := newAliasedNoSNITransport(base, false, map[string]string{aliasProbeHost: aliasProbeOrigin})
+	_, err := (&http.Client{Transport: rt}).Get("https://" + aliasProbeHost + "/")
+	require.Error(t, err, "显式代理与源站别名冲突时应报错")
+	assert.Contains(t, err.Error(), "源站别名")
+	assert.Contains(t, err.Error(), "代理")
+	assert.Zero(t, deadProxy.connects.Load(), "报错应发生在发起连接之前")
+}
+
+// TestNoSNIAliasKeepsProxyForOtherHosts 断言本层只处理需要别名的主机：
+// 其余主机（例如图片主机）经代理时行为不变——仍经代理、仍不发送 SNI。
+func TestNoSNIAliasKeepsProxyForOtherHosts(t *testing.T) {
+	var serverName atomic.Value
+	server := newTLSServer(t, statusHandler(http.StatusOK), &serverName)
+	proxy := newECHTestProxy(t, server.Listener.Addr().String())
+
+	base := defaultBaseTransport()
+	base.TLSClientConfig.InsecureSkipVerify = true
+	base.Proxy = http.ProxyURL(mustProxyURL(t, proxy.url))
+
+	rt := newAliasedNoSNITransport(base, false, map[string]string{aliasProbeHost: aliasProbeOrigin})
+	resp, err := (&http.Client{Transport: rt}).Get("https://" + imageProbeHost + "/")
+	require.NoError(t, err, "不需要别名的主机不受本层处理影响")
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, "", serverName.Load(), "经代理时仍不发送 SNI")
+}
+
+// TestNoSNIAliasKeepsCallerProxySettings 断言两种代理来源下都不改变调用者传输的
+// 代理设置：忽略隐式代理只发生在该通道自己的克隆上。
+func TestNoSNIAliasKeepsCallerProxySettings(t *testing.T) {
+	base := defaultBaseTransport()
+	proxyURL := mustProxyURL(t, "http://127.0.0.1:7890")
+	base.Proxy = http.ProxyURL(proxyURL)
+
+	for _, implicit := range []bool{false, true} {
+		_ = newAliasedNoSNITransport(base, implicit, map[string]string{aliasProbeHost: aliasProbeOrigin})
+
+		require.NotNil(t, base.Proxy, "不应清空调用者传输的代理设置（implicit=%v）", implicit)
+		req, err := http.NewRequest(http.MethodGet, "https://"+aliasProbeHost+"/", nil)
+		require.NoError(t, err)
+		got, err := base.Proxy(req)
+		require.NoError(t, err)
+		assert.Equal(t, proxyURL.String(), got.String(),
+			"调用者的传输仍应使用代理（implicit=%v）", implicit)
+	}
+}
+
+// TestAutoTransportPassesProxySourceToAliasChannel 断言装配把代理的来源
+// （隐式/显式）传给需要别名的主机的不发送 SNI 的通道，与 ECH 同一套语义。
+func TestAutoTransportPassesProxySourceToAliasChannel(t *testing.T) {
+	selfBuilt := &AutoTransport{}
+	selfBuilt.setup()
+	selfBuiltAlias, ok := selfBuilt.nosni.(*aliasedNoSNITransport)
+	require.True(t, ok, "自建 base 时应装配该通道（实际 %T）", selfBuilt.nosni)
+	assert.True(t, selfBuiltAlias.implicitProxy, "自建 base 的代理应视为隐式")
+
+	callerBase := &AutoTransport{Base: defaultBaseTransport()}
+	callerBase.setup()
+	callerAlias, ok := callerBase.nosni.(*aliasedNoSNITransport)
+	require.True(t, ok, "调用者提供 base 时同样装配该通道（实际 %T）", callerBase.nosni)
+	assert.False(t, callerAlias.implicitProxy, "调用者的 base 中的代理应视为显式")
+}
+
+// TestAutoTransportAliasNeedsDirectConnection 断言需要源站别名的主机不会把请求
+// 发给调用者显式指定的代理：别名在代理下无法生效，请求会落到别名之外的对端。
+//
+// 该候选报错不应让整次请求失败：AutoTransport 仍经常规通道取得响应。
+func TestAutoTransportAliasNeedsDirectConnection(t *testing.T) {
+	var serverName atomic.Value
+	server := newTLSServer(t, statusHandler(http.StatusOK), &serverName)
+	proxy := newECHTestProxy(t, server.Listener.Addr().String())
+
+	base := defaultBaseTransport()
+	base.TLSClientConfig.InsecureSkipVerify = true
+	base.Proxy = http.ProxyURL(mustProxyURL(t, proxy.url))
+
+	// 需要别名的主机取库的清单里的真实主机：别名是库的知识（见 noSNIHostTarget）。
+	rt := &AutoTransport{
+		Base:      base,
+		hostNames: &hostSets{api: map[string]struct{}{"www.pixiv.net": {}}},
+	}
+	resp, err := (&http.Client{Transport: rt}).Get("https://www.pixiv.net/")
+	require.NoError(t, err, "该候选报错不应让整次请求失败")
+	defer resp.Body.Close()
+	assert.Equal(t, http.StatusOK, resp.StatusCode)
+	assert.Equal(t, int64(1), proxy.connects.Load(),
+		"只有常规通道把请求发给代理；需要别名的主机不应发出这次请求")
+}
+
+// #endregion
+
+// deadProxyURL 返回指向必然失败地址的代理 URL：需要「请求不经代理」的用例用它，
+// 使「真的走了代理」表现为请求失败，而不是被静默忽略。
+func deadProxyURL(t *testing.T) *url.URL {
+	t.Helper()
+	return mustProxyURL(t, "http://127.0.0.1:1")
+}
+
+// mustProxyURL 解析代理 URL。
+func mustProxyURL(t *testing.T, raw string) *url.URL {
+	t.Helper()
+	u, err := url.Parse(raw)
+	require.NoError(t, err)
+	return u
 }
 
 // TestNewNoSNITransportSuppressesSNI 断言原语确实不发送 SNI：
