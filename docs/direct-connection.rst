@@ -176,6 +176,23 @@ SNI 阻断机制
 拨号解析到 ``pixiv.net`` 源站；ECH 与常规仍解析 ``www.pixiv.net``（Cloudflare）。
 两种传输由此可以同时拨通：``www.pixiv.net`` 被污染时 ECH 失败，no-SNI 仍经源站完成握手。
 
+**别名只在直连拨号时生效。** ``resolverDialContext`` 只在拨号目标正是该通道负责
+解析的主机时才施加别名；经代理时拨号目标是代理地址，别名分支不进入，``CONNECT``
+的目标仍是 ``www.pixiv.net:443``，由代理解析到 Cloudflare。此时该通道退化为
+「不发送 SNI 去连 Cloudflare」——而 Cloudflare 正是不接受无 SNI 握手的一方，
+它会落到默认 server block，返回 ``403``，也可能返回 ``404``。
+
+这不会让请求整体失败，但会让它走一段无意义的路：``403`` 会被
+``NewNoSNITransport`` 报为错误并回落到常规连接；``404`` 不会，会被
+``AutoTransport`` 当成该方式可用并记住，常规连接因此不再被尝试。2026-10-19 实测
+（本地 CONNECT 代理）：默认 no-SNI 通道向代理发出 ``CONNECT www.pixiv.net:443``；
+把底层传输的 ``Proxy`` 置空后同一通道直连、代理收不到任何连接、返回 ``403``。
+
+``echTransport`` 已按代理的来源区分处理：底层传输由库自建（代理只来自进程环境
+变量）时清空代理，调用者显式提供代理时快速失败并说明冲突。no-SNI 通道没有对应
+处理，这是 issue #109 的根因。该通道「经代理仍不发送 SNI」的能力对 ``i.pximg.net``
+是正确的（无别名，直连与代理落到同一对端），问题只出在需要源站别名的 API 主机上。
+
 源站接受不发送 SNI 的握手、证书 ``*.pixiv.net`` 也能通过主机名校验，但它在 HTTP 层
 拒绝 API 主机的请求。2026-10-09 实测经 no-SNI 连接 ``pixiv.net`` 源站：TLS 握手与
 证书校验均通过，随后 nginx 对**一切路径**——根路径、``/ajax/search/novels/...``、
