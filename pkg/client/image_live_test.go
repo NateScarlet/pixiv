@@ -33,7 +33,11 @@ const (
 )
 
 // TestFetchImageLive 断言真实图片主机上取回成功：
-// 附带 Referer 后返回 200，且响应头可供调用者读取格式与长度。
+// 附带 Referer 后返回 200，Content-Type 可读，且响应体字节可读。
+//
+// 不断言 Content-Length 一定存在：实测该头并非所有网络路径都返回
+// （见 TestFetchImageLiveMiniWorksWithoutAssumingContentLength），
+// 把它写死成断言会让本用例随接入路径变化而误报。头存在时仍校验字节数一致。
 func TestFetchImageLive(t *testing.T) {
 	testenv.RequireLive(t)
 	c := New()
@@ -44,7 +48,13 @@ func TestFetchImageLive(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, resp.StatusCode)
 	assert.Equal(t, "image/jpeg", resp.Header.Get("Content-Type"))
-	assert.NotEmpty(t, resp.Header.Get("Content-Length"))
+
+	got, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	assert.NotEmpty(t, got, "响应体应可读")
+	if cl := resp.Header.Get("Content-Length"); cl != "" {
+		assert.Equal(t, cl, strconv.Itoa(len(got)), "头存在时字节数应与之一致")
+	}
 }
 
 // TestFetchImageLiveWithoutRefererIsRejected 断言不携带 Referer 的同一请求
