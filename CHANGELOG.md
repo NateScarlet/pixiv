@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file. See [standard-version](https://github.com/conventional-changelog/standard-version) for commit guidelines.
 
+## [0.11.4](https://github.com/NateScarlet/pixiv/compare/v0.11.3...v0.11.4) (2026-11-23)
+
+
+### Bug Fixes
+
+* **test:** should not require Content-Length in live image fetch test ([fab503a](https://github.com/NateScarlet/pixiv/commit/fab503ae5c61ee092ff8ec48eaad5d4815cc8441))
+
 ## [0.11.3](https://github.com/NateScarlet/pixiv/compare/v0.11.2...v0.11.3) (2026-10-19)
 
 
